@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jensoon — M1 Core Loop</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; overflow: hidden; }
+  canvas { display: block; }
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  #player-bar {
+    position: absolute; bottom: 24px; left: 24px;
+  }
+  .lbl {
+    font-family: 'Courier New', monospace; font-size: 11px;
+    color: #ffd23f; letter-spacing: 3px;
+    text-shadow: 0 0 10px rgba(255,210,63,0.7); margin-bottom: 5px;
+  }
+  .bar {
+    width: 200px; height: 10px;
+    background: rgba(0,0,0,0.75); border: 1.5px solid rgba(255,210,63,0.45);
+    border-radius: 5px; overflow: hidden;
+  }
+  .fill { height: 100%; border-radius: 4px; }
+  #pfill { background: linear-gradient(90deg, #ff6b35, #ffd23f); width: 100%; }
+  #hint {
+    position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+    font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 2px;
+    color: rgba(251,247,236,0.55); text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+    transition: opacity 1.4s ease; white-space: nowrap;
+  }
+  #ko {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    font-family: Impact, sans-serif; font-size: 72px; color: #ffd23f;
+    text-shadow: 4px 4px 0 #e63946, 9px 9px 20px rgba(0,0,0,0.85);
+    letter-spacing: 6px; opacity: 0; transition: opacity 0.25s;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="player-bar">
+    <div class="lbl">JENSOON</div>
+    <div class="bar"><div class="fill" id="pfill"></div></div>
+  </div>
+  <div id="hint">[CLICK / SPACE] STRETCH PUNCH &nbsp;·&nbsp; [WASD] MOVE &nbsp;·&nbsp; [RIGHT-DRAG] ROTATE CAM</div>
+  <div id="ko">K.O.!</div>
+</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ─────────────────────────────────────────────────────────────
+// AUDIO — synthesised, no files
+// ─────────────────────────────────────────────────────────────
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+const resume = () => { if (AC.state === 'suspended') AC.resume(); };
+
+function noise(dur, freq, bw, vol) {
+  const buf = AC.createBuffer(1, AC.sampleRate * dur, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+  const src = AC.createBufferSource(); src.buffer = buf;
+  const f = AC.createBiquadFilter(); f.type = 'bandpass';
+  f.frequency.value = freq; f.Q.value = bw;
+  const g = AC.createGain(); g.gain.setValueAtTime(vol, AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
+  src.connect(f); f.connect(g); g.connect(AC.destination); src.start();
+}
+
+function tone(startHz, endHz, dur, vol, type = 'sine') {
+  const t = AC.currentTime;
+  const osc = AC.createOscillator(); osc.type = type;
+  osc.frequency.setValueAtTime(startHz, t);
+  osc.frequency.exponentialRampToValueAtTime(endHz, t + dur);
+  const g = AC.createGain(); g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur + 0.02);
+  osc.connect(g); g.connect(AC.destination);
+  osc.start(); osc.stop(t + dur + 0.04);
+}
+
+const sfx = {
+  whoosh: () => noise(0.12, 900, 1.4, 0.35),
+  thud:   () => { tone(110, 38, 0.20, 0.85); noise(0.07, 300, 0.8, 0.4); },
+  ko:     () => tone(290, 55, 0.65, 0.35, 'sawtooth'),
+};
+
+// ─────────────────────────────────────────────────────────────
+// EASING
+// ─────────────────────────────────────────────────────────────
+const ease = {
+  inQuad:   t => t * t,
+  outQuint: t => 1 - Math.pow(1 - t, 5),
+  outBack:  t => { const c = 1.70158; return 1 + (c+1)*Math.pow(t-1,3) + c*Math.pow(t-1,2); },
+};
+const expLerp = (k, dt) => 1 - Math.exp(-k * dt);
+
+// ─────────────────────────────────────────────────────────────
+// RENDERER / SCENE / CAMERA
+// ─────────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1b6ca8);
+scene.fog = new THREE.Fog(0x1b6ca8, 28, 70);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 150);
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ─────────────────────────────────────────────────────────────
+// LIGHTS
+// ─────────────────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0x7fd3ff, 0.75));
+
+const sun = new THREE.DirectionalLight(0xffd23f, 2.2);
+sun.position.set(10, 18, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 60;
+sun.shadow.camera.left = sun.shadow.camera.bottom = -20;
+sun.shadow.camera.right = sun.shadow.camera.top = 20;
+sun.shadow.bias = -0.001;
+scene.add(sun);
+
+const fill = new THREE.DirectionalLight(0xff9e5e, 0.5);
+fill.position.set(-8, 5, -6);
+scene.add(fill);
+
+// ─────────────────────────────────────────────────────────────
+// TOON MATERIAL HELPERS
+// ─────────────────────────────────────────────────────────────
+function makeToonGrad() {
+  const data = new Uint8Array([50,50,90,255, 130,130,185,255, 255,255,255,255]);
+  const tex = new THREE.DataTexture(data, 3, 1, THREE.RGBAFormat);
+  tex.needsUpdate = true;
+  tex.magFilter = tex.minFilter = THREE.NearestFilter;
+  return tex;
+}
+const GRAD = makeToonGrad();
+
+function toon(hex) {
+  return new THREE.MeshToonMaterial({ color: hex, gradientMap: GRAD });
+}
+
+function outline(mesh, t = 0.046) {
+  const o = mesh.clone();
+  o.material = new THREE.MeshBasicMaterial({ color: 0x07070f, side: THREE.BackSide });
+  o.scale.multiplyScalar(1 + t);
+  o.castShadow = false;
+  mesh.add(o);
+}
+
+function node(geo, mat, py, parent, shadow = true) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.y = py;
+  if (shadow) { m.castShadow = true; m.receiveShadow = false; }
+  outline(m);
+  parent.add(m);
+  return m;
+}
+
+// ─────────────────────────────────────────────────────────────
+// ENVIRONMENT
+// ─────────────────────────────────────────────────────────────
+// Ground
+const gnd = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), toon(0x4a9e4a));
+gnd.rotation.x = -Math.PI / 2;
+gnd.receiveShadow = true;
+scene.add(gnd);
+
+// Sandy arena
+const sand = new THREE.Mesh(new THREE.CircleGeometry(9, 36), toon(0xd4a843));
+sand.rotation.x = -Math.PI / 2;
+sand.position.y = 0.01;
+scene.add(sand);
+
+// Rocks
+[[-4,0,-10],[5,0,-8],[-6,0,4],[7,0,5],[0,0,7]].forEach(([x,,z]) => {
+  const r = new THREE.Mesh(
+    new THREE.DodecahedronGeometry(0.45 + Math.random() * 0.35, 0), toon(0x7a8a8a));
+  r.position.set(x, 0.28, z);
+  r.rotation.set(Math.random()*2, Math.random()*2, Math.random()*2);
+  r.castShadow = true; r.receiveShadow = true;
+  outline(r, 0.04); scene.add(r);
+});
+
+// Palm trees
+function palm(x, z) {
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.17, 3.8, 8), toon(0x8a5a2a));
+  trunk.position.set(x, 1.9, z); trunk.castShadow = true;
+  outline(trunk, 0.06); scene.add(trunk);
+  for (let a = 0; a < 5; a++) {
+    const ang = (a / 5) * Math.PI * 2;
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.65, 1.9, 5), toon(0x2e7a2e));
+    leaf.position.set(x + Math.cos(ang) * 1.1, 4.0, z + Math.sin(ang) * 1.1);
+    leaf.rotation.set(Math.cos(ang) * 0.55, ang, Math.sin(ang) * 0.55);
+    leaf.castShadow = true; scene.add(leaf);
+  }
+}
+[[-10,-6],[9,-9],[-12,8],[10,6]].forEach(([x,z]) => palm(x, z));
+
+// ─────────────────────────────────────────────────────────────
+// CHARACTER FACTORY
+// ─────────────────────────────────────────────────────────────
+function buildChar({ skin, shirt, pants, hatCol, band }) {
+  const mSkin  = toon(skin);
+  const mShirt = toon(shirt);
+  const mPants = toon(pants);
+  const mHat   = toon(hatCol);
+  const mBand  = toon(band);
+  const allMats = [mSkin, mShirt, mPants, mHat, mBand];
+
+  const root = new THREE.Group();
+
+  // Torso
+  const torso = node(new THREE.CapsuleGeometry(0.30, 0.50, 8, 12), mShirt, 1.06, root);
+
+  // Head
+  const head = node(new THREE.SphereGeometry(0.27, 16, 12), mSkin, 0.53, torso);
+
+  // Hat — brim (wide flat cylinder), crown (tapered), band
+  const brim  = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.48, 0.055, 20), mHat);
+  brim.position.y = 0.14; head.add(brim); outline(brim, 0.03);
+
+  const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.27, 0.38, 12), mHat);
+  crown.position.y = 0.35; head.add(crown); outline(crown, 0.03);
+
+  const bandM = new THREE.Mesh(new THREE.CylinderGeometry(0.275, 0.275, 0.095, 12), mBand);
+  bandM.position.y = 0.195; head.add(bandM);
+
+  // Arms
+  function arm(side) {
+    const sp = new THREE.Group();
+    sp.position.set(side * 0.41, 0.22, 0);
+    torso.add(sp);
+
+    const upper = node(new THREE.CapsuleGeometry(0.095, 0.25, 6, 8), mSkin, -0.18, sp);
+
+    const fp = new THREE.Group();   // forearm pivot (elbow)
+    fp.position.y = -0.34;
+    upper.add(fp);
+
+    const fore = node(new THREE.CapsuleGeometry(0.085, 0.28, 6, 8), mSkin, -0.20, fp);
+    return { sp, upper, fp, fore };
+  }
+  const armR = arm(1);
+  const armL = arm(-1);
+
+  // Legs
+  const hips = new THREE.Group();
+  hips.position.y = -0.28;
+  torso.add(hips);
+
+  function leg(side) {
+    const thigh = node(new THREE.CapsuleGeometry(0.115, 0.30, 6, 8), mPants, -0.24, hips);
+    thigh.position.x = side * 0.155;
+    const shin = node(new THREE.CapsuleGeometry(0.095, 0.28, 6, 8), mPants, -0.36, thigh);
+    return { thigh, shin };
+  }
+  const legR = leg(1);
+  const legL = leg(-1);
+
+  return { root, torso, head, armR, armL, legR, legL, hips, allMats };
+}
+
+// ─────────────────────────────────────────────────────────────
+// SPAWN PLAYER + ENEMY
+// ─────────────────────────────────────────────────────────────
+const playerRig = buildChar({
+  skin: 0xc8845a, shirt: 0xe63946, pants: 0x1a3a6a,
+  hatCol: 0xd4a843, band: 0xe63946,
+});
+scene.add(playerRig.root);
+
+const enemyRig = buildChar({
+  skin: 0xc8a87a, shirt: 0x2a3550, pants: 0x1a2235,
+  hatCol: 0x2a3550, band: 0xffd23f,
+});
+enemyRig.root.position.set(0, 0, -7);
+scene.add(enemyRig.root);
+
+// Enemy HP bar (3D plane that faces camera)
+const hpBg = new THREE.Mesh(
+  new THREE.PlaneGeometry(1.3, 0.13),
+  new THREE.MeshBasicMaterial({ color: 0x0a0a1e, transparent: true, opacity: 0.85, depthTest: false })
+);
+hpBg.position.set(0, 3.1, 0);
+hpBg.renderOrder = 10;
+enemyRig.root.add(hpBg);
+
+const hpFill = new THREE.Mesh(
+  new THREE.PlaneGeometry(1.18, 0.075),
+  new THREE.MeshBasicMaterial({ color: 0xe63946, depthTest: false })
+);
+hpFill.position.z = 0.01;
+hpFill.renderOrder = 11;
+hpBg.add(hpFill);
+
+// ─────────────────────────────────────────────────────────────
+// GAME STATE
+// ─────────────────────────────────────────────────────────────
+const player = {
+  pos:    new THREE.Vector3(0, 0, 0),
+  facing: 0,
+  speed:  5.5,
+  punch:  { phase: 'idle', t: 0, dir: new THREE.Vector3(0, 0, -1) },
+};
+
+const enemy = {
+  pos:     new THREE.Vector3(0, 0, -7),
+  hp:      100,
+  maxHp:   100,
+  kbVel:   new THREE.Vector3(),
+  flash:   0,
+  stagger: 0,
+  bobT:    0,
+  dead:    false,
+  fallT:   -1,
+};
+
+// ─────────────────────────────────────────────────────────────
+// INPUT
+// ─────────────────────────────────────────────────────────────
+const keys = new Set();
+window.addEventListener('keydown', e => {
+  keys.add(e.code);
+  if (e.code === 'Space') { e.preventDefault(); resume(); punch(); }
+});
+window.addEventListener('keyup', e => keys.delete(e.code));
+
+let camYaw = 0, dragging = false, dragX = 0;
+window.addEventListener('mousedown',  e => { resume(); if (e.button === 0) punch(); if (e.button === 2) { dragging = true; dragX = e.clientX; } });
+window.addEventListener('mouseup',    e => { if (e.button === 2) dragging = false; });
+window.addEventListener('mousemove',  e => { if (dragging) { camYaw -= (e.clientX - dragX) * 0.005; dragX = e.clientX; } });
+window.addEventListener('contextmenu', e => e.preventDefault());
+window.addEventListener('touchstart', e => { resume(); punch(); }, { passive: true });
+
+// ─────────────────────────────────────────────────────────────
+// PUNCH STATE MACHINE
+// ─────────────────────────────────────────────────────────────
+const PH = { telegraph: 0.18, extend: 0.09, hold: 0.06, recover: 0.24 };
+const hintEl = document.getElementById('hint');
+let hintShown = false;
+
+function punch() {
+  if (player.punch.phase !== 'idle') return;
+  player.punch.phase = 'telegraph';
+  player.punch.t = 0;
+  player.punch.dir.set(-Math.sin(player.facing), 0, -Math.cos(player.facing));
+  if (!hintShown) { hintShown = true; hintEl.style.opacity = '0'; }
+}
+
+function tickPunch(dt) {
+  const p = player.punch;
+  if (p.phase === 'idle') return;
+  p.t += dt;
+
+  const sp = playerRig.armR.sp;   // right shoulder pivot
+  const fp = playerRig.armR.fp;   // right forearm pivot (elbow)
+
+  if (p.phase === 'telegraph') {
+    const e = ease.inQuad(Math.min(p.t / PH.telegraph, 1));
+    sp.rotation.x = -e * 0.9;
+    sp.rotation.z = -e * 0.22;
+    playerRig.torso.rotation.y = e * 0.42;
+    if (p.t >= PH.telegraph) { p.phase = 'extend'; p.t = 0; sfx.whoosh(); }
+
+  } else if (p.phase === 'extend') {
+    const e = ease.outQuint(Math.min(p.t / PH.extend, 1));
+    sp.rotation.x = -0.9 + e * 1.55;   // swings forward past rest
+    sp.rotation.z = -0.22 + e * 0.22;
+    fp.scale.y    = 1 + e * 2.9;        // rubber arm stretch
+    playerRig.torso.rotation.y = 0.42 * (1 - e);
+    if (p.t >= PH.extend) { p.phase = 'hold'; p.t = 0; checkHit(); }
+
+  } else if (p.phase === 'hold') {
+    fp.scale.y = 3.9;
+    if (p.t >= PH.hold) { p.phase = 'recover'; p.t = 0; }
+
+  } else if (p.phase === 'recover') {
+    const e = ease.outBack(Math.min(p.t / PH.recover, 1));
+    sp.rotation.x = 0.65 - e * 0.65;
+    fp.scale.y    = 3.9 - e * 2.9;
+    if (p.t >= PH.recover) {
+      p.phase = 'idle';
+      sp.rotation.set(0, 0, 0);
+      fp.scale.y = 1;
+      playerRig.torso.rotation.y = 0;
+    }
+  }
+}
+
+function checkHit() {
+  if (enemy.dead) return;
+  if (player.pos.distanceTo(enemy.pos) > 4.0) return;
+
+  enemy.hp = Math.max(0, enemy.hp - 25);
+  enemy.kbVel.copy(player.punch.dir).multiplyScalar(5.0);
+  enemy.flash   = 0.18;
+  enemy.stagger = 0.38;
+  sfx.thud();
+
+  // update HP bar fill
+  const pct = enemy.hp / enemy.maxHp;
+  hpFill.scale.x    = Math.max(0.001, pct);
+  hpFill.position.x = -(1 - pct) * 0.59;
+
+  spawnSparks(enemy.pos.clone().add(new THREE.Vector3(0, 1.5, 0)));
+
+  if (enemy.hp <= 0 && !enemy.dead) {
+    enemy.dead  = true;
+    enemy.fallT = 0;
+    sfx.ko();
+    setTimeout(() => {
+      const el = document.getElementById('ko');
+      el.style.opacity = '1';
+      setTimeout(() => { el.style.opacity = '0'; }, 1800);
+    }, 180);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// HIT SPARKS
+// ─────────────────────────────────────────────────────────────
+const sparks = [];
+function spawnSparks(origin) {
+  for (let i = 0; i < 12; i++) {
+    const m = new THREE.Mesh(
+      new THREE.SphereGeometry(0.058, 4, 4),
+      new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0xffd23f : 0xff6b35, transparent: true })
+    );
+    m.position.copy(origin);
+    scene.add(m);
+    sparks.push({
+      m,
+      life: 0.48,
+      v: new THREE.Vector3((Math.random()-0.5)*7, Math.random()*5+2, (Math.random()-0.5)*7),
+    });
+  }
+}
+function tickSparks(dt) {
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const s = sparks[i];
+    s.life -= dt;
+    s.v.y  -= 15 * dt;
+    s.m.position.addScaledVector(s.v, dt);
+    s.m.material.opacity = Math.max(0, s.life / 0.48);
+    if (s.life <= 0) { scene.remove(s.m); sparks.splice(i, 1); }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// WALK / IDLE ANIMATION
+// ─────────────────────────────────────────────────────────────
+let walkT = 0;
+
+function animWalk(rig, spd, dt) {
+  walkT += dt * spd * 3.6;
+  const s = Math.sin(walkT);
+  if (player.punch.phase === 'idle') {
+    rig.armR.sp.rotation.x = -s * 0.44;
+    rig.armL.sp.rotation.x =  s * 0.44;
+  }
+  rig.legR.thigh.rotation.x =  s * 0.58;
+  rig.legL.thigh.rotation.x = -s * 0.58;
+  rig.legR.shin.rotation.x  = Math.max(0, -s) * 0.52;
+  rig.legL.shin.rotation.x  = Math.max(0,  s) * 0.52;
+}
+
+function animIdle(rig, t) {
+  const b = Math.sin(t * 1.9) * 0.027;
+  rig.root.position.y = b;
+  if (player.punch.phase === 'idle') {
+    rig.armR.sp.rotation.x =  Math.sin(t * 1.9) * 0.055;
+    rig.armL.sp.rotation.x = -Math.sin(t * 1.9) * 0.055;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// CAMERA STATE
+// ─────────────────────────────────────────────────────────────
+const camPos  = new THREE.Vector3(0, 8, 14);
+const camLook = new THREE.Vector3(0, 1.4, 0);
+const CAM_OFFSET = new THREE.Vector3(0, 6, 12);
+
+// ─────────────────────────────────────────────────────────────
+// MAIN LOOP
+// ─────────────────────────────────────────────────────────────
+let prev = performance.now(), total = 0;
+
+function loop() {
+  requestAnimationFrame(loop);
+  const now = performance.now();
+  const dt  = Math.min((now - prev) / 1000, 0.05);
+  prev = now; total += dt;
+
+  // ── Player movement ────────────────────────────────────────
+  // Camera-relative world axes
+  const cf = new THREE.Vector3(-Math.sin(camYaw), 0, -Math.cos(camYaw)); // forward
+  const cr = new THREE.Vector3( Math.cos(camYaw), 0, -Math.sin(camYaw)); // right
+
+  const mv = new THREE.Vector3();
+  if (keys.has('KeyW') || keys.has('ArrowUp'))    mv.addScaledVector(cf,  1);
+  if (keys.has('KeyS') || keys.has('ArrowDown'))  mv.addScaledVector(cf, -1);
+  if (keys.has('KeyA') || keys.has('ArrowLeft'))  mv.addScaledVector(cr, -1);
+  if (keys.has('KeyD') || keys.has('ArrowRight')) mv.addScaledVector(cr,  1);
+
+  const moving = mv.lengthSq() > 0.001;
+  if (moving) {
+    mv.normalize();
+    player.pos.addScaledVector(mv, player.speed * dt);
+    player.pos.x = Math.max(-38, Math.min(38, player.pos.x));
+    player.pos.z = Math.max(-38, Math.min(38, player.pos.z));
+
+    // smooth rotation toward movement direction
+    const want = Math.atan2(-mv.x, -mv.z);
+    let diff = want - player.facing;
+    while (diff >  Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    player.facing += diff * Math.min(1, 14 * dt);
+
+    animWalk(playerRig, player.speed, dt);
+    playerRig.root.position.y = 0;
+  } else {
+    animIdle(playerRig, total);
+    // settle legs back to rest
+    playerRig.legR.thigh.rotation.x *= 0.80;
+    playerRig.legL.thigh.rotation.x *= 0.80;
+    playerRig.legR.shin.rotation.x  *= 0.80;
+    playerRig.legL.shin.rotation.x  *= 0.80;
+  }
+  playerRig.root.position.x = player.pos.x;
+  playerRig.root.position.z = player.pos.z;
+  playerRig.root.rotation.y = player.facing;
+
+  // ── Punch ──────────────────────────────────────────────────
+  tickPunch(dt);
+
+  // ── Enemy ──────────────────────────────────────────────────
+  if (!enemy.dead) {
+    enemy.bobT += dt;
+
+    // knockback — exponential decay
+    if (enemy.kbVel.lengthSq() > 0.001) {
+      enemy.pos.addScaledVector(enemy.kbVel, dt);
+      enemy.pos.x = Math.max(-35, Math.min(35, enemy.pos.x));
+      enemy.pos.z = Math.max(-35, Math.min(35, enemy.pos.z));
+      enemy.kbVel.multiplyScalar(Math.pow(0.002, dt));
+    }
+
+    enemyRig.root.position.set(
+      enemy.pos.x,
+      Math.sin(enemy.bobT * 1.35) * 0.042,
+      enemy.pos.z
+    );
+
+    // red flash
+    enemy.flash -= dt;
+    const fl = enemy.flash > 0 ? 0.9 : 0;
+    enemyRig.allMats.forEach(m => { m.emissive.setRGB(fl, 0, 0); m.emissiveIntensity = fl; });
+
+    // stagger — torso hunches
+    enemy.stagger -= dt;
+    if (enemy.stagger > 0) {
+      const tt = 1 - enemy.stagger / 0.38;
+      enemyRig.torso.rotation.x = Math.sin(tt * Math.PI) * 0.48;
+    } else {
+      enemyRig.torso.rotation.x *= 0.86;
+    }
+
+    // idle arm sway
+    enemyRig.armR.sp.rotation.x =  Math.sin(enemy.bobT * 1.35) * 0.065;
+    enemyRig.armL.sp.rotation.x = -Math.sin(enemy.bobT * 1.35) * 0.065;
+
+  } else if (enemy.fallT >= 0) {
+    enemy.fallT = Math.min(enemy.fallT + dt, 0.55);
+    const fe = ease.inQuad(enemy.fallT / 0.55);
+    enemyRig.root.position.set(enemy.pos.x, -fe * 0.32, enemy.pos.z);
+    enemyRig.root.rotation.z = fe * (Math.PI / 2);
+    const gray = new THREE.Color(0.40, 0.40, 0.40);
+    enemyRig.allMats.forEach(m => m.color.lerp(gray, 0.045));
+  }
+
+  // HP bar always faces camera
+  hpBg.lookAt(camera.position);
+
+  // ── Sparks ─────────────────────────────────────────────────
+  tickSparks(dt);
+
+  // ── Camera follow ──────────────────────────────────────────
+  const rotOff = CAM_OFFSET.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), camYaw);
+  const wantPos  = player.pos.clone().add(rotOff);
+  const wantLook = player.pos.clone().add(new THREE.Vector3(0, 1.4, 0));
+  camPos.lerp(wantPos,   expLerp(9,  dt));
+  camLook.lerp(wantLook, expLerp(12, dt));
+  camera.position.copy(camPos);
+  camera.lookAt(camLook);
+
+  renderer.render(scene, camera);
+}
+
+loop();
+</script>
+</body>
+</html>
