@@ -336,17 +336,66 @@ const lantern=new THREE.Mesh(new THREE.SphereGeometry(0.18,8,6),lMat);
 lantern.position.set(-13,5.2,-2.4); scene.add(lantern);
 const lLight=new THREE.PointLight(0xffa020,3,9); lLight.position.copy(lantern.position); scene.add(lLight);
 
-// Prison (west-north)
-const prisMat=pbr(0x7a7060,0.95);
+// Prison (west-north) — darker grimy stone
+const prisMat=pbr(0x4a4540,0.97);
 sbox(8,5,6,prisMat,-13,0,-9);
-// Bars
-for(let i=-3;i<=3;i++){
-  const bar=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,4.8,6),pbr(0x282828,0.6,0.85));
-  bar.position.set(-13+i*0.72,2.4,-6.1); bar.castShadow=true; scene.add(bar);
+// Roof slab
+sbox(8.3,0.28,6.3,pbr(0x363230,0.96),-13,5,-9);
+
+// Iron bar material (reused)
+const ironMat=new THREE.MeshStandardMaterial({color:0x1e1e1e,roughness:0.35,metalness:0.92});
+// Thick corner posts of bar wall
+for(const bx of [-16.65,-9.35]){
+  const p=new THREE.Mesh(new THREE.BoxGeometry(0.22,5.05,0.22),ironMat);
+  p.position.set(bx,2.52,-6.06); p.castShadow=true; scene.add(p);
 }
-const hbar=new THREE.Mesh(new THREE.BoxGeometry(5.2,0.12,0.12),pbr(0x282828,0.6,0.85));
-hbar.position.set(-13,1.4,-6.1); scene.add(hbar);
-const hbar2=hbar.clone(); hbar2.position.set(-13,3.6,-6.1); scene.add(hbar2);
+// Top and floor rails
+for(const by of [0.06,4.96]){
+  const r=new THREE.Mesh(new THREE.BoxGeometry(7.5,0.16,0.14),ironMat);
+  r.position.set(-13,by,-6.06); scene.add(r);
+}
+// Vertical bars — 14 bars close together
+for(let i=0;i<14;i++){
+  const bx=-16.4+i*0.52;
+  const bar=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,4.84,8),ironMat);
+  bar.position.set(bx,2.5,-6.06); bar.castShadow=true; scene.add(bar);
+}
+// Three horizontal cross-rails
+for(const by of [1.1,2.5,3.85]){
+  const r=new THREE.Mesh(new THREE.BoxGeometry(7.3,0.08,0.08),ironMat);
+  r.position.set(-13,by,-6.06); scene.add(r);
+}
+// Door frame (two slightly inset uprights suggesting a locked door)
+for(const bx of [-14.1,-12.0]){
+  const p=new THREE.Mesh(new THREE.BoxGeometry(0.1,4.9,0.1),ironMat);
+  p.position.set(bx,2.5,-6.0); scene.add(p);
+}
+// Padlock on door
+const lockMat=new THREE.MeshStandardMaterial({color:0x8a7020,roughness:0.35,metalness:0.85});
+const lockBody=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.22,0.12),lockMat);
+lockBody.position.set(-13.05,2.1,-5.97); scene.add(lockBody);
+const lockShackle=new THREE.Mesh(new THREE.TorusGeometry(0.09,0.028,6,12,Math.PI),lockMat);
+lockShackle.position.set(-13.05,2.34,-5.97); lockShackle.rotation.x=Math.PI; scene.add(lockShackle);
+// Small window bars on east wall of cell
+for(let i=0;i<4;i++){
+  const wb=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,1.8,8),ironMat);
+  wb.position.set(-9.06,3.4,-7.5+i*0.5); wb.rotation.z=Math.PI/2; scene.add(wb);
+}
+// Interior: plank bed
+const bedMat=new THREE.MeshStandardMaterial({color:0x6a4a1a,roughness:0.9});
+sbox(2.0,0.16,0.7,bedMat,-11.5,0.16,-11.3);
+sbox(0.12,0.32,0.7,bedMat,-10.56,0,-11.3);
+sbox(0.12,0.32,0.7,bedMat,-12.44,0,-11.3);
+const pillow=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.09,0.55),pbr(0xb8a888,0.95));
+pillow.position.set(-11.5,0.34,-11.0); scene.add(pillow);
+// Interior: bucket
+const bucket=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.11,0.28,8),pbr(0x5a4010,0.85));
+bucket.position.set(-14.8,0.14,-11.2); scene.add(bucket);
+// Interior dim lantern
+const cellLanMat=new THREE.MeshStandardMaterial({color:0xffd23f,emissive:new THREE.Color(0.7,0.3,0),emissiveIntensity:1.1,roughness:0.4});
+const cellLan=new THREE.Mesh(new THREE.SphereGeometry(0.11,6,5),cellLanMat);
+cellLan.position.set(-13,4.3,-11.2); scene.add(cellLan);
+const cellPt=new THREE.PointLight(0xff9010,1.8,6); cellPt.position.copy(cellLan.position); scene.add(cellPt);
 
 // Clue sign (near west wall interior, visible from tavern)
 function signPost(x,z,lines){
@@ -423,6 +472,60 @@ function palm(px,pz){
   const c=new THREE.Mesh(new THREE.CylinderGeometry(6+Math.random()*4,9+Math.random()*5,h,7),pbr(0x6a7060,0.95));
   c.position.set(x,h*0.4-1.5,z); c.rotation.y=Math.random()*Math.PI; c.castShadow=true; scene.add(c);
 });
+
+// ── COLLISION ────────────────────────────────────────────────
+// AABB list: [minX, maxX, minZ, maxZ]
+const COLLIDERS=[
+  // South wall segments
+  [-22,-8.7, 14.4,15.6],
+  [ 8.7, 22, 14.4,15.6],
+  // Gate pillars
+  [-5.0,-3.6, 14.4,15.6],
+  [ 3.6, 5.0, 14.4,15.6],
+  // North wall
+  [-23, 23,-26.6,-25.4],
+  // East wall
+  [ 22.4, 23.6,-26, 15],
+  // West wall
+  [-23.6,-22.4,-26, 15],
+  // Corner towers (SW, SE, NW, NE)
+  [-24,-20, 12, 16],
+  [ 20, 24, 12, 16],
+  [-24,-20,-27,-23],
+  [ 20, 24,-27,-23],
+  // Barracks
+  [  7, 19,-6.5, 2.5],
+  // Tavern
+  [-19, -7,-2,   8  ],
+  // Prison
+  [-17, -9,-12, -6  ],
+  // HQ main
+  [ -8,  8,-25,-13  ],
+  // HQ side towers
+  [-10.9,-7.1,-20.9,-17.1],
+  [  7.1,10.9,-20.9,-17.1],
+];
+const COL_R=0.45;
+function resolveWalls(pos){
+  for(const [x1,x2,z1,z2] of COLLIDERS){
+    const cx=Math.max(x1,Math.min(x2,pos.x));
+    const cz=Math.max(z1,Math.min(z2,pos.z));
+    const dx=pos.x-cx, dz=pos.z-cz;
+    const d2=dx*dx+dz*dz;
+    if(d2===0){
+      // fully inside — push out shortest side
+      const dl=pos.x-x1,dr=x2-pos.x,dt=pos.z-z1,db=z2-pos.z;
+      const mn=Math.min(dl,dr,dt,db);
+      if(mn===dl) pos.x=x1-COL_R;
+      else if(mn===dr) pos.x=x2+COL_R;
+      else if(mn===dt) pos.z=z1-COL_R;
+      else pos.z=z2+COL_R;
+    } else if(d2<COL_R*COL_R){
+      const d=Math.sqrt(d2);
+      pos.x+=dx/d*(COL_R-d); pos.z+=dz/d*(COL_R-d);
+    }
+  }
+}
 
 // ── CHARACTER FACTORY ─────────────────────────────────────────
 function buildChar({skin,shirt,pants,hatCol,band}){
@@ -835,6 +938,7 @@ function loop(){
       playerRig.legR.shin.rotation.x*=0.82;  playerRig.legL.shin.rotation.x*=0.82;
     }
   }
+  resolveWalls(player.pos);
   playerRig.root.position.x=player.pos.x;
   playerRig.root.position.z=player.pos.z;
   playerRig.root.rotation.y=player.facing;
@@ -915,6 +1019,7 @@ function loop(){
     }
     m.pos.x=Math.max(-46,Math.min(46,m.pos.x));
     m.pos.z=Math.max(-28,Math.min(38,m.pos.z));
+    resolveWalls(m.pos);
 
     const dp=m.pos.distanceTo(player.pos);
     m.attackCd=Math.max(0,m.attackCd-dt);
