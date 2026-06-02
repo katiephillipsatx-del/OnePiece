@@ -261,20 +261,29 @@ const STONE=new THREE.MeshStandardMaterial({map:stoneTex(),roughness:0.95});
 const WOOD =new THREE.MeshStandardMaterial({map:woodTex(), roughness:0.88});
 
 // ── GROUND & WATER ────────────────────────────────────────────
-const gnd=new THREE.Mesh(new THREE.PlaneGeometry(200,200,60,60),
-  new THREE.MeshStandardMaterial({map:grassTex(),roughness:0.95}));
-gnd.rotation.x=-Math.PI/2; gnd.receiveShadow=true; scene.add(gnd);
+// Water fills the whole world floor
+const waterMat=new THREE.MeshStandardMaterial({color:0x1a6090,roughness:0.03,metalness:0.55,transparent:true,opacity:0.92});
+const waterGnd=new THREE.Mesh(new THREE.PlaneGeometry(1400,1400,2,2),waterMat);
+waterGnd.rotation.x=-Math.PI/2; waterGnd.position.y=-0.08; waterGnd.receiveShadow=true; scene.add(waterGnd);
+
+// Island land mass — elliptical disc above water
+const islandMat=new THREE.MeshStandardMaterial({map:grassTex(),roughness:0.95});
+const islandMesh=new THREE.Mesh(new THREE.CylinderGeometry(38,39.5,0.18,36),islandMat);
+islandMesh.scale.set(1,1,1.05); islandMesh.position.set(0,0.0,-2);
+islandMesh.receiveShadow=true; scene.add(islandMesh);
+
+// Sandy beach ring at island edge
+const beachMat=new THREE.MeshStandardMaterial({map:sandTex(),roughness:0.93});
+const beach=new THREE.Mesh(new THREE.CylinderGeometry(39.5,41,0.12,36),beachMat);
+beach.scale.set(1,1,1.05); beach.position.set(0,-0.04,-2); beach.receiveShadow=true; scene.add(beach);
 
 const dockSand=new THREE.Mesh(new THREE.PlaneGeometry(22,14),
   new THREE.MeshStandardMaterial({map:sandTex(),roughness:0.92}));
-dockSand.rotation.x=-Math.PI/2; dockSand.position.set(0,0.01,22); scene.add(dockSand);
+dockSand.rotation.x=-Math.PI/2; dockSand.position.set(0,0.1,22); scene.add(dockSand);
 
-const shore=new THREE.Mesh(new THREE.RingGeometry(60,74,64),
-  new THREE.MeshStandardMaterial({map:sandTex(),roughness:0.94}));
-shore.rotation.x=-Math.PI/2; shore.position.y=-0.02; scene.add(shore);
-
+// Distant horizon ocean (still visible beyond island)
 const oceanMat=new THREE.MeshStandardMaterial({color:0x1a5c8c,roughness:0.04,metalness:0.55,transparent:true,opacity:0.9});
-const ocean=new THREE.Mesh(new THREE.PlaneGeometry(1400,1400),oceanMat);
+const ocean=new THREE.Mesh(new THREE.PlaneGeometry(3000,3000),oceanMat);
 ocean.rotation.x=-Math.PI/2; ocean.position.y=-1.4; scene.add(ocean);
 
 // ── SCENE BOX HELPER ─────────────────────────────────────────
@@ -531,6 +540,7 @@ const boss={
 
 let orozFreed=false, clueFound=false, marinesKilled=0;
 let gameOver=false, gameWon=false;
+let waterDmgTimer=0;
 
 const QEL=[0,1,2,3].map(i=>document.getElementById('q'+i));
 const interactEl=document.getElementById('interact');
@@ -781,6 +791,7 @@ function loop(){
   prev=now; total+=dt;
 
   oceanMat.color.setHSL(0.57,0.72,0.28+Math.sin(total*0.4)*0.02);
+  waterMat.color.setHSL(0.565,0.72,0.30+Math.sin(total*0.55+0.8)*0.028);
   flag.rotation.z=Math.sin(total*2.1)*0.13;
 
   if(gameOver||gameWon){ composer.render(); return; }
@@ -797,8 +808,8 @@ function loop(){
   if(moving){
     mv.normalize();
     player.pos.addScaledVector(mv,player.speed*dt);
-    player.pos.x=Math.max(-46,Math.min(46,player.pos.x));
-    player.pos.z=Math.max(-28,Math.min(38,player.pos.z));
+    player.pos.x=Math.max(-60,Math.min(60,player.pos.x));
+    player.pos.z=Math.max(-60,Math.min(60,player.pos.z));
     const want=Math.atan2(-mv.x,-mv.z);
     let diff=want-player.facing;
     while(diff>Math.PI)diff-=Math.PI*2; while(diff<-Math.PI)diff+=Math.PI*2;
@@ -828,6 +839,19 @@ function loop(){
   playerRig.root.position.z=player.pos.z;
   playerRig.root.rotation.y=player.facing;
   tickPunch(dt); tickKick(dt);
+
+  // ── WATER DAMAGE ──
+  // Island is a ~38-unit ellipse centered at (0,-2), scaled Z x1.05
+  const wx=player.pos.x, wz=(player.pos.z+2)/1.05;
+  if(Math.sqrt(wx*wx+wz*wz)>38){
+    waterDmgTimer+=dt;
+    if(waterDmgTimer>=0.5){ damagePlayer(12); waterDmgTimer=0; }
+    // Blue tint flash instead of red while in water
+    dmgFlash.style.background=`rgba(20,80,160,${0.18+Math.sin(total*8)*0.08})`;
+  } else {
+    waterDmgTimer=0;
+    if(dmgFlash.style.background.startsWith('rgba(20')){ dmgFlash.style.background='rgba(230,57,70,0)'; }
+  }
 
   // ── KOBE FOLLOWS ──
   const kobeTarget=new THREE.Vector3(player.pos.x-2,0,player.pos.z+1.2);
