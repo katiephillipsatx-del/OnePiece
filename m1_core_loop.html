@@ -618,9 +618,26 @@ playerRig.root.position.set(0,0,22); scene.add(playerRig.root);
 const kobeRig=buildChar({skin:0xc8a880,shirt:0x2a3550,pants:0x1a2040,hatCol:0x2a3550,band:0xe63946});
 kobeRig.root.position.set(-2.5,0,23); scene.add(kobeRig.root);
 
-const orozRig=buildChar({skin:0xc89060,shirt:0x383030,pants:0x282020,hatCol:0x282020,band:0x8a7060});
+// Oroz — green hair, green robe, pink sash, katana at hip
+const orozRig=buildChar({skin:0xd4b896,shirt:0x3a7030,pants:0x1e1e28,hatCol:0x20b820,band:0x20b820});
 orozRig.root.position.set(-13,0,-10.5); scene.add(orozRig.root);
-orozRig.root.rotation.y=0; // faces south, visible through bars
+orozRig.root.rotation.y=0;
+orozRig.root.scale.setScalar(1.08);
+// Pink sash over the torso
+const sash=new THREE.Mesh(new THREE.CylinderGeometry(0.315,0.315,0.22,12),new THREE.MeshToonMaterial({color:0xb03070,gradientMap:GRAD}));
+sash.position.y=-0.05; orozRig.torso.add(sash);
+// Katana at left hip
+const oSword=new THREE.Group();
+oSword.position.set(-0.38,-0.18,0.06); oSword.rotation.z=0.38;
+orozRig.torso.add(oSword);
+const oHandle=new THREE.Mesh(new THREE.CylinderGeometry(0.028,0.028,0.40,8),new THREE.MeshStandardMaterial({color:0x1a1008,roughness:0.85}));
+oSword.add(oHandle);
+const oWrap=new THREE.Mesh(new THREE.CylinderGeometry(0.032,0.032,0.14,8),new THREE.MeshStandardMaterial({color:0x6a1a30,roughness:0.9}));
+oWrap.position.y=-0.08; oSword.add(oWrap);
+const oGuard=new THREE.Mesh(new THREE.BoxGeometry(0.13,0.026,0.055),new THREE.MeshStandardMaterial({color:0xc8a020,roughness:0.3,metalness:0.82}));
+oGuard.position.y=0.21; oSword.add(oGuard);
+const oBlade=new THREE.Mesh(new THREE.BoxGeometry(0.016,0.68,0.032),new THREE.MeshStandardMaterial({color:0xc8ccd8,roughness:0.12,metalness:0.96}));
+oBlade.position.y=0.55; oSword.add(oBlade);
 
 const bobRig=buildChar({skin:0xe8c8a0,shirt:0x4a8040,pants:0x2a4020,hatCol:0x4a8040,band:0xffd23f});
 bobRig.root.position.set(-10,0,5); scene.add(bobRig.root);
