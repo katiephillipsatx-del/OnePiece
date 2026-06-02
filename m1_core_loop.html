@@ -68,12 +68,14 @@ canvas { display:block; }
     <div class="q-item" id="q1">Free Oroz from prison</div>
     <div class="q-item" id="q2">Defeat marines (0/5)</div>
     <div class="q-item" id="q3">Beat Axe Hand Guy</div>
+    <div class="q-item" id="q4" style="display:none">Find Nora</div>
   </div>
   <div id="crew">
     <div class="c-title">CREW</div>
     <div class="c-member">⚓ Jensoon</div>
     <div class="c-member" id="cm-kobe">· Kobe</div>
     <div class="c-member" id="cm-oroz" style="opacity:0.3">· Oroz (imprisoned)</div>
+    <div class="c-member" id="cm-nora" style="display:none">🧭 Nora (Navigator)</div>
   </div>
   <div id="ko">K.O.!</div>
 </div>
@@ -93,6 +95,7 @@ canvas { display:block; }
   <p>AXE HAND GUY IS DEFEATED.</p>
   <p style="color:rgba(255,210,63,0.7);margin-top:10px">A TREASURE MAP FALLS FROM HIS COAT...</p>
   <p style="margin-top:4px">SIDE QUEST UNLOCKED: FIND NORA</p>
+  <button id="win-continue" class="restart" style="margin-top:24px;border-color:#ffd23f;color:#ffd23f">CONTINUE →</button>
 </div>
 
 <div id="gameover">
@@ -539,9 +542,9 @@ function buildChar({skin,shirt,pants,hatCol,band}){
   const torso=cnode(new THREE.CapsuleGeometry(0.30,0.50,8,12),mSh,1.06,root);
   const head=cnode(new THREE.SphereGeometry(0.27,16,12),mSk,0.53,torso);
   const brim=new THREE.Mesh(new THREE.CylinderGeometry(0.46,0.48,0.055,20),mHa);
-  brim.position.y=0.14; head.add(brim); outline(brim,0.03);
+  brim.position.y=0.14; head.add(brim);
   const crown=new THREE.Mesh(new THREE.CylinderGeometry(0.20,0.27,0.38,12),mHa);
-  crown.position.y=0.35; head.add(crown); outline(crown,0.03);
+  crown.position.y=0.35; head.add(crown);
   const bandM=new THREE.Mesh(new THREE.CylinderGeometry(0.275,0.275,0.095,12),mBa);
   bandM.position.y=0.195; head.add(bandM);
   function arm(side){
@@ -608,6 +611,10 @@ orozRig.root.rotation.y=0; // faces south, visible through bars
 const bobRig=buildChar({skin:0xe8c8a0,shirt:0x4a8040,pants:0x2a4020,hatCol:0x4a8040,band:0xffd23f});
 bobRig.root.position.set(-10,0,5); scene.add(bobRig.root);
 
+// Nora — navigator, hidden until boss defeated
+const noraRig=buildChar({skin:0xd4a07a,shirt:0xe67e30,pants:0x2a3060,hatCol:0xe67e30,band:0xffd23f});
+noraRig.root.position.set(5,0,28); noraRig.root.visible=false; scene.add(noraRig.root);
+
 // Marines
 const M_SPAWNS=[{x:0,z:12},{x:17,z:0},{x:-10,z:-9},{x:4,z:-5},{x:0,z:-12}];
 const marines=M_SPAWNS.map(({x,z},i)=>{
@@ -647,10 +654,18 @@ const boss={
 };
 
 let orozFreed=false, clueFound=false, marinesKilled=0;
-let gameOver=false, gameWon=false;
+let gameOver=false, gameWon=false, noraQuest=false, noraFound=false;
 let waterDmgTimer=0;
 
-const QEL=[0,1,2,3].map(i=>document.getElementById('q'+i));
+const QEL=[0,1,2,3,4].map(i=>document.getElementById('q'+i));
+document.getElementById('win-continue').addEventListener('click',()=>{
+  document.getElementById('win').classList.remove('active');
+  gameWon=false; // re-enable loop
+  noraQuest=true;
+  noraRig.root.visible=true;
+  QEL[4].style.display='';
+  // Add a sign post near Nora pointing players to the dock
+});
 const interactEl=document.getElementById('interact');
 const dmgFlash=document.getElementById('dmg-flash');
 const hintEl=document.getElementById('hint');
@@ -723,6 +738,14 @@ window.addEventListener('touchstart',()=>{resume();doKick();},{passive:true});
 let interactTarget=null;
 function tryInteract(){
   if(interactTarget==='prison'&&!orozFreed) puzzleEl.classList.add('active');
+  if(interactTarget==='nora'&&!noraFound){
+    noraFound=true;
+    QEL[4].classList.add('done');
+    document.getElementById('cm-nora').style.display='';
+    interactEl.textContent='NORA JOINED THE CREW!'; interactEl.style.opacity='1';
+    setTimeout(()=>{ interactEl.style.opacity='0'; },2500);
+    sfx.unlock();
+  }
 }
 
 // ── ATTACK TIMING ─────────────────────────────────────────────
@@ -989,11 +1012,20 @@ function loop(){
   bobRig.root.position.y=Math.sin(total*1.05+1.8)*0.022;
   bobRig.root.rotation.y+=dt*0.4;
 
+  // Nora idle (faces player when visible)
+  if(noraQuest&&!noraFound){
+    idleAnim(noraRig,total+3.1);
+    noraRig.root.rotation.y=Math.atan2(player.pos.x-noraRig.root.position.x,player.pos.z-noraRig.root.position.z);
+  }
+
   // ── INTERACT CHECK ──
   const dPrison=player.pos.distanceTo(new THREE.Vector3(-13,0,-9));
+  const dNora=noraQuest&&!noraFound ? player.pos.distanceTo(noraRig.root.position) : Infinity;
   if(dPrison<3.8&&!orozFreed){
     interactEl.textContent='[E] OPEN COMBINATION LOCK'; interactEl.style.opacity='1'; interactTarget='prison';
     if(!clueFound){ clueFound=true; QEL[0].classList.add('done'); }
+  } else if(dNora<3.5){
+    interactEl.textContent='[E] TALK TO NORA'; interactEl.style.opacity='1'; interactTarget='nora';
   } else {
     interactEl.style.opacity='0'; interactTarget=null;
   }
