@@ -43,6 +43,13 @@ canvas { display:block; }
 #pclose { margin-top:12px; background:none; border:none; color:rgba(251,247,236,0.35); font-family:'Courier New',monospace; font-size:10px; cursor:pointer; letter-spacing:2px; }
 #pmsg { font-size:12px; letter-spacing:2px; height:20px; margin-top:8px; }
 
+/* Dialogue box */
+#dialogue { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); width:540px; max-width:90vw; background:rgba(0,0,0,0.88); border:2px solid rgba(255,210,63,0.55); border-radius:8px; padding:16px 22px 14px; font-family:'Courier New',monospace; display:none; pointer-events:all; z-index:50; }
+#dialogue.active { display:block; }
+#dlg-name { font-size:10px; color:#ffd23f; letter-spacing:4px; margin-bottom:7px; }
+#dlg-text { font-size:13px; color:rgba(251,247,236,0.92); letter-spacing:1px; line-height:1.6; }
+#dlg-next { font-size:10px; color:rgba(255,210,63,0.45); letter-spacing:2px; text-align:right; margin-top:10px; }
+
 /* Win / Game Over */
 #win,#gameover { position:fixed; inset:0; background:rgba(0,0,0,0.9); display:none; align-items:center; justify-content:center; flex-direction:column; z-index:200; }
 #win.active,#gameover.active { display:flex; }
@@ -80,6 +87,12 @@ canvas { display:block; }
   <div id="ko">K.O.!</div>
 </div>
 <div id="dmg-flash"></div>
+
+<div id="dialogue">
+  <div id="dlg-name"></div>
+  <div id="dlg-text"></div>
+  <div id="dlg-next">[ E ] CONTINUE</div>
+</div>
 
 <div id="puzzle">
   <h2>COMBINATION LOCK</h2>
@@ -736,16 +749,44 @@ window.addEventListener('contextmenu',e=>e.preventDefault());
 window.addEventListener('touchstart',()=>{resume();doKick();},{passive:true});
 
 // ── INTERACT ──────────────────────────────────────────────────
+// ── DIALOGUE SYSTEM ───────────────────────────────────────────
+const dlgEl=document.getElementById('dialogue');
+const dlgName=document.getElementById('dlg-name');
+const dlgText=document.getElementById('dlg-text');
+let dlgLines=[],dlgIdx=0,dlgActive=false,dlgOnDone=null;
+
+function startDialogue(lines,onDone){
+  dlgLines=lines; dlgIdx=0; dlgActive=true; dlgOnDone=onDone;
+  dlgName.textContent=lines[0].name; dlgText.textContent=lines[0].text;
+  dlgEl.classList.add('active');
+}
+function advanceDlg(){
+  if(!dlgActive) return;
+  dlgIdx++;
+  if(dlgIdx>=dlgLines.length){
+    dlgEl.classList.remove('active'); dlgActive=false;
+    if(dlgOnDone) dlgOnDone();
+  } else {
+    dlgName.textContent=dlgLines[dlgIdx].name;
+    dlgText.textContent=dlgLines[dlgIdx].text;
+  }
+}
+dlgEl.addEventListener('click',advanceDlg);
+
 let interactTarget=null;
 function tryInteract(){
+  if(dlgActive){ advanceDlg(); return; }
   if(interactTarget==='prison'&&!orozFreed) puzzleEl.classList.add('active');
   if(interactTarget==='nora'&&!noraFound){
-    noraFound=true;
-    QEL[4].classList.add('done');
-    document.getElementById('cm-nora').style.display='';
-    interactEl.textContent='NORA JOINED THE CREW!'; interactEl.style.opacity='1';
-    setTimeout(()=>{ interactEl.style.opacity='0'; },2500);
-    sfx.unlock();
+    startDialogue([
+      {name:'JENSOON', text:'Can you join my crew?'},
+      {name:'NORA',    text:'Yes!'},
+    ],()=>{
+      noraFound=true;
+      QEL[4].classList.add('done');
+      document.getElementById('cm-nora').style.display='';
+      sfx.unlock();
+    });
   }
 }
 
