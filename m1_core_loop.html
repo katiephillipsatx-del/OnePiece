@@ -60,7 +60,7 @@ canvas { display:block; }
     <div class="lbl">JENSOON</div>
     <div class="bar"><div class="fill" id="pfill"></div></div>
   </div>
-  <div id="hint">[LEFT CLICK] KICK &nbsp;·&nbsp; [RIGHT CLICK] PUNCH &nbsp;·&nbsp; [WASD] MOVE &nbsp;·&nbsp; [E] INTERACT &nbsp;·&nbsp; [RIGHT-DRAG] CAM</div>
+  <div id="hint">[LEFT CLICK] KICK &nbsp;·&nbsp; [RIGHT CLICK] PUNCH &nbsp;·&nbsp; [WASD] MOVE &nbsp;·&nbsp; [E] INTERACT</div>
   <div id="interact"></div>
   <div id="quest-log">
     <div class="q-title">QUEST LOG</div>
@@ -1084,6 +1084,12 @@ function loop(){
   tickSparks(dt);
 
   // ── CAMERA ──
+  // When moving, swing camera to follow player's back
+  if(moving){
+    let fd=player.facing-camYaw;
+    while(fd>Math.PI)fd-=Math.PI*2; while(fd<-Math.PI)fd+=Math.PI*2;
+    camYaw+=fd*expLerp(7,dt);
+  }
   const rotOff=CAM_OFF.clone().applyAxisAngle(new THREE.Vector3(0,1,0),camYaw);
   camPos.lerp(player.pos.clone().add(rotOff),expLerp(9,dt));
   camLook.lerp(player.pos.clone().add(new THREE.Vector3(0,1.4,0)),expLerp(12,dt));
