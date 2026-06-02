@@ -548,19 +548,21 @@ function rayAABB(ox,oz,dx,dz,maxT,x1,x2,z1,z2){
 }
 
 // ── CHARACTER FACTORY ─────────────────────────────────────────
-function buildChar({skin,shirt,pants,hatCol,band}){
+function buildChar({skin,shirt,pants,hatCol,band,noHat=false}){
   const mSk=toon(skin),mSh=toon(shirt),mPa=toon(pants),mHa=toon(hatCol),mBa=toon(band);
   const allMats=[mSk,mSh,mPa,mHa,mBa];
   const root=new THREE.Group();
   const torso=cnode(new THREE.CapsuleGeometry(0.30,0.50,8,12),mSh,1.06,root);
   const head=new THREE.Mesh(new THREE.SphereGeometry(0.27,16,12),mSk);
   head.position.y=0.53; head.castShadow=true; torso.add(head);
-  const brim=new THREE.Mesh(new THREE.CylinderGeometry(0.46,0.48,0.055,20),mHa);
-  brim.position.y=0.14; head.add(brim);
-  const crown=new THREE.Mesh(new THREE.CylinderGeometry(0.20,0.27,0.38,12),mHa);
-  crown.position.y=0.35; head.add(crown);
-  const bandM=new THREE.Mesh(new THREE.CylinderGeometry(0.275,0.275,0.095,12),mBa);
-  bandM.position.y=0.195; head.add(bandM);
+  if(!noHat){
+    const brim=new THREE.Mesh(new THREE.CylinderGeometry(0.46,0.48,0.055,20),mHa);
+    brim.position.y=0.14; head.add(brim);
+    const crown=new THREE.Mesh(new THREE.CylinderGeometry(0.20,0.27,0.38,12),mHa);
+    crown.position.y=0.35; head.add(crown);
+    const bandM=new THREE.Mesh(new THREE.CylinderGeometry(0.275,0.275,0.095,12),mBa);
+    bandM.position.y=0.195; head.add(bandM);
+  }
   function arm(side){
     const sp=new THREE.Group(); sp.position.set(side*0.41,0.22,0); torso.add(sp);
     const upper=cnode(new THREE.CapsuleGeometry(0.095,0.25,6,8),mSk,-0.18,sp);
@@ -619,7 +621,7 @@ const kobeRig=buildChar({skin:0xc8a880,shirt:0x2a3550,pants:0x1a2040,hatCol:0x2a
 kobeRig.root.position.set(-2.5,0,23); scene.add(kobeRig.root);
 
 // Oroz — green hair, green robe, pink sash, katana at hip
-const orozRig=buildChar({skin:0xd4b896,shirt:0x3a7030,pants:0x1e1e28,hatCol:0x20b820,band:0x20b820});
+const orozRig=buildChar({skin:0xd4b896,shirt:0x3a7030,pants:0x1e1e28,hatCol:0x20b820,band:0x20b820,noHat:true});
 orozRig.root.position.set(-13,0,-10.5); scene.add(orozRig.root);
 orozRig.root.rotation.y=0;
 orozRig.root.scale.setScalar(1.08);
@@ -638,6 +640,16 @@ const oGuard=new THREE.Mesh(new THREE.BoxGeometry(0.13,0.026,0.055),new THREE.Me
 oGuard.position.y=0.21; oSword.add(oGuard);
 const oBlade=new THREE.Mesh(new THREE.BoxGeometry(0.016,0.68,0.032),new THREE.MeshStandardMaterial({color:0xc8ccd8,roughness:0.12,metalness:0.96}));
 oBlade.position.y=0.55; oSword.add(oBlade);
+// Green hair — short dome on top of head
+const hairMat=new THREE.MeshToonMaterial({color:0x20c820,gradientMap:GRAD});
+const hairDome=new THREE.Mesh(new THREE.SphereGeometry(0.28,12,8,0,Math.PI*2,0,Math.PI*0.52),hairMat);
+hairDome.position.y=0.06; orozRig.head.add(hairDome);
+// A few green tufts for spiky look
+[-0.12,0,0.12].forEach((ox,i)=>{
+  const tuft=new THREE.Mesh(new THREE.ConeGeometry(0.06,0.18,6),hairMat);
+  tuft.position.set(ox,0.3+Math.abs(i-1)*0.04,0); tuft.rotation.z=(i-1)*0.25;
+  orozRig.head.add(tuft);
+});
 
 const bobRig=buildChar({skin:0xe8c8a0,shirt:0x4a8040,pants:0x2a4020,hatCol:0x4a8040,band:0xffd23f});
 bobRig.root.position.set(-10,0,5); scene.add(bobRig.root);
