@@ -336,66 +336,55 @@ const lantern=new THREE.Mesh(new THREE.SphereGeometry(0.18,8,6),lMat);
 lantern.position.set(-13,5.2,-2.4); scene.add(lantern);
 const lLight=new THREE.PointLight(0xffa020,3,9); lLight.position.copy(lantern.position); scene.add(lLight);
 
-// Prison (west-north) — darker grimy stone
+// Prison (west-north) — open-face cell, bars ARE the south wall
 const prisMat=pbr(0x4a4540,0.97);
-sbox(8,5,6,prisMat,-13,0,-9);
-// Roof slab
-sbox(8.3,0.28,6.3,pbr(0x363230,0.96),-13,5,-9);
+// Three solid walls + ceiling (south face left OPEN for bars)
+sbox(8.4,5.0,0.4,prisMat,-13,0,-12.2); // back wall
+sbox(0.4,5.0,6.4,prisMat,-17.2,0,-9);  // left wall
+sbox(0.4,5.0,6.4,prisMat, -8.8,0,-9);  // right wall
+sbox(8.4,0.4,6.8,prisMat,-13,5.0,-9);  // ceiling
+sbox(8.0,0.12,6.2,pbr(0x282420,0.98),-13,0,-9); // dark floor
 
-// Iron bar material (reused)
-const ironMat=new THREE.MeshStandardMaterial({color:0x1e1e1e,roughness:0.35,metalness:0.92});
-// Thick corner posts of bar wall
-for(const bx of [-16.65,-9.35]){
-  const p=new THREE.Mesh(new THREE.BoxGeometry(0.22,5.05,0.22),ironMat);
-  p.position.set(bx,2.52,-6.06); p.castShadow=true; scene.add(p);
-}
-// Top and floor rails
-for(const by of [0.06,4.96]){
-  const r=new THREE.Mesh(new THREE.BoxGeometry(7.5,0.16,0.14),ironMat);
-  r.position.set(-13,by,-6.06); scene.add(r);
-}
-// Vertical bars — 14 bars close together
-for(let i=0;i<14;i++){
-  const bx=-16.4+i*0.52;
-  const bar=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,4.84,8),ironMat);
-  bar.position.set(bx,2.5,-6.06); bar.castShadow=true; scene.add(bar);
+// Iron bars — south (front) face of cell
+const ironMat=new THREE.MeshStandardMaterial({color:0x1a1a1a,roughness:0.3,metalness:0.95});
+// Outer frame
+const frameGeo=new THREE.BoxGeometry(0.2,5.1,0.2);
+[-16.9,-9.1].forEach(bx=>{
+  const p=new THREE.Mesh(frameGeo,ironMat); p.position.set(bx,2.5,-6); p.castShadow=true; scene.add(p);
+});
+sbox(8.0,0.18,0.18,new THREE.MeshStandardMaterial({color:0x1a1a1a,roughness:0.3,metalness:0.95}),-13,0.0,-6);
+sbox(8.0,0.18,0.18,new THREE.MeshStandardMaterial({color:0x1a1a1a,roughness:0.3,metalness:0.95}),-13,5.0,-6);
+// Vertical bars — 15 bars
+for(let i=0;i<15;i++){
+  const bx=-16.5+i*0.54;
+  const bar=new THREE.Mesh(new THREE.CylinderGeometry(0.065,0.065,5.0,8),ironMat);
+  bar.position.set(bx,2.5,-6); bar.castShadow=true; scene.add(bar);
 }
 // Three horizontal cross-rails
-for(const by of [1.1,2.5,3.85]){
-  const r=new THREE.Mesh(new THREE.BoxGeometry(7.3,0.08,0.08),ironMat);
-  r.position.set(-13,by,-6.06); scene.add(r);
-}
-// Door frame (two slightly inset uprights suggesting a locked door)
-for(const bx of [-14.1,-12.0]){
-  const p=new THREE.Mesh(new THREE.BoxGeometry(0.1,4.9,0.1),ironMat);
-  p.position.set(bx,2.5,-6.0); scene.add(p);
-}
-// Padlock on door
-const lockMat=new THREE.MeshStandardMaterial({color:0x8a7020,roughness:0.35,metalness:0.85});
-const lockBody=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.22,0.12),lockMat);
-lockBody.position.set(-13.05,2.1,-5.97); scene.add(lockBody);
-const lockShackle=new THREE.Mesh(new THREE.TorusGeometry(0.09,0.028,6,12,Math.PI),lockMat);
-lockShackle.position.set(-13.05,2.34,-5.97); lockShackle.rotation.x=Math.PI; scene.add(lockShackle);
-// Small window bars on east wall of cell
-for(let i=0;i<4;i++){
-  const wb=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,1.8,8),ironMat);
-  wb.position.set(-9.06,3.4,-7.5+i*0.5); wb.rotation.z=Math.PI/2; scene.add(wb);
-}
-// Interior: plank bed
-const bedMat=new THREE.MeshStandardMaterial({color:0x6a4a1a,roughness:0.9});
-sbox(2.0,0.16,0.7,bedMat,-11.5,0.16,-11.3);
-sbox(0.12,0.32,0.7,bedMat,-10.56,0,-11.3);
-sbox(0.12,0.32,0.7,bedMat,-12.44,0,-11.3);
-const pillow=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.09,0.55),pbr(0xb8a888,0.95));
-pillow.position.set(-11.5,0.34,-11.0); scene.add(pillow);
-// Interior: bucket
+[1.1,2.5,3.9].forEach(by=>{
+  const r=new THREE.Mesh(new THREE.BoxGeometry(8.0,0.09,0.09),ironMat);
+  r.position.set(-13,by,-6); scene.add(r);
+});
+// Padlock
+const lockMat=new THREE.MeshStandardMaterial({color:0x9a8020,roughness:0.3,metalness:0.88});
+const lockBody=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.24,0.14),lockMat);
+lockBody.position.set(-13.1,2.1,-5.92); scene.add(lockBody);
+const lockShackle=new THREE.Mesh(new THREE.TorusGeometry(0.1,0.03,6,12,Math.PI),lockMat);
+lockShackle.position.set(-13.1,2.37,-5.92); lockShackle.rotation.x=Math.PI; scene.add(lockShackle);
+// Interior: plank bed against back wall
+sbox(2.0,0.16,0.65,pbr(0x6a4a1a,0.9),-11.5,0.16,-11.2);
+sbox(0.12,0.32,0.65,pbr(0x5a3a10,0.92),-10.55,0,-11.2);
+sbox(0.12,0.32,0.65,pbr(0x5a3a10,0.92),-12.45,0,-11.2);
+const pillow=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.1,0.5),pbr(0xb0a080,0.95));
+pillow.position.set(-11.5,0.35,-11.0); scene.add(pillow);
+// Bucket
 const bucket=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.11,0.28,8),pbr(0x5a4010,0.85));
-bucket.position.set(-14.8,0.14,-11.2); scene.add(bucket);
-// Interior dim lantern
-const cellLanMat=new THREE.MeshStandardMaterial({color:0xffd23f,emissive:new THREE.Color(0.7,0.3,0),emissiveIntensity:1.1,roughness:0.4});
-const cellLan=new THREE.Mesh(new THREE.SphereGeometry(0.11,6,5),cellLanMat);
-cellLan.position.set(-13,4.3,-11.2); scene.add(cellLan);
-const cellPt=new THREE.PointLight(0xff9010,1.8,6); cellPt.position.copy(cellLan.position); scene.add(cellPt);
+bucket.position.set(-14.8,0.14,-11.0); scene.add(bucket);
+// Dim lantern inside
+const cellLanMat=new THREE.MeshStandardMaterial({color:0xffd23f,emissive:new THREE.Color(0.7,0.3,0),emissiveIntensity:1.2,roughness:0.4});
+const cellLan=new THREE.Mesh(new THREE.SphereGeometry(0.12,6,5),cellLanMat);
+cellLan.position.set(-13,4.4,-11.5); scene.add(cellLan);
+const cellPt=new THREE.PointLight(0xff9010,2.2,7); cellPt.position.copy(cellLan.position); scene.add(cellPt);
 
 // Clue sign (near west wall interior, visible from tavern)
 function signPost(x,z,lines){
@@ -598,7 +587,8 @@ const kobeRig=buildChar({skin:0xc8a880,shirt:0x2a3550,pants:0x1a2040,hatCol:0x2a
 kobeRig.root.position.set(-2.5,0,23); scene.add(kobeRig.root);
 
 const orozRig=buildChar({skin:0xc89060,shirt:0x383030,pants:0x282020,hatCol:0x282020,band:0x8a7060});
-orozRig.root.position.set(-13,0,-9); scene.add(orozRig.root);
+orozRig.root.position.set(-13,0,-10.5); scene.add(orozRig.root);
+orozRig.root.rotation.y=0; // faces south, visible through bars
 
 const bobRig=buildChar({skin:0xe8c8a0,shirt:0x4a8040,pants:0x2a4020,hatCol:0x4a8040,band:0xffd23f});
 bobRig.root.position.set(-10,0,5); scene.add(bobRig.root);
