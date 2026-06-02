@@ -502,7 +502,6 @@ function resolveWalls(pos){
     const dx=pos.x-cx, dz=pos.z-cz;
     const d2=dx*dx+dz*dz;
     if(d2===0){
-      // fully inside — push out shortest side
       const dl=pos.x-x1,dr=x2-pos.x,dt=pos.z-z1,db=z2-pos.z;
       const mn=Math.min(dl,dr,dt,db);
       if(mn===dl) pos.x=x1-COL_R;
@@ -514,6 +513,22 @@ function resolveWalls(pos){
       pos.x+=dx/d*(COL_R-d); pos.z+=dz/d*(COL_R-d);
     }
   }
+}
+
+// 2-D (XZ) ray vs AABB — returns hit distance or Infinity
+function rayAABB(ox,oz,dx,dz,maxT,x1,x2,z1,z2){
+  let lo=0,hi=maxT;
+  if(Math.abs(dx)>1e-6){
+    const a=(x1-ox)/dx,b=(x2-ox)/dx;
+    lo=Math.max(lo,Math.min(a,b)); hi=Math.min(hi,Math.max(a,b));
+  } else if(ox<x1||ox>x2) return Infinity;
+  if(Math.abs(dz)>1e-6){
+    const a=(z1-oz)/dz,b=(z2-oz)/dz;
+    lo=Math.max(lo,Math.min(a,b)); hi=Math.min(hi,Math.max(a,b));
+  } else if(oz<z1||oz>z2) return Infinity;
+  if(hi<lo) return Infinity;
+  // lo>1 means we start outside and enter at lo; otherwise we start inside
+  return lo>1.0 ? lo : Infinity;
 }
 
 // ── CHARACTER FACTORY ─────────────────────────────────────────
@@ -698,7 +713,7 @@ window.addEventListener('mouseup',e=>{
 window.addEventListener('mousemove',e=>{
   if(dragging && (e.buttons&2)){
     if(Math.abs(e.clientX-rDownX)>5||Math.abs(e.clientY-rDownY)>5) rMoved=true;
-    if(rMoved){ camYaw-=(e.clientX-dragX)*0.005; dragX=e.clientX; }
+    if(rMoved){ camYaw-=(e.clientX-dragX)*0.002; dragX=e.clientX; }
   }
 });
 window.addEventListener('contextmenu',e=>e.preventDefault());
@@ -1084,14 +1099,30 @@ function loop(){
   tickSparks(dt);
 
   // ── CAMERA ──
-  // When moving, swing camera to follow player's back
+  // Swing to player's back while moving
   if(moving){
     let fd=player.facing-camYaw;
     while(fd>Math.PI)fd-=Math.PI*2; while(fd<-Math.PI)fd+=Math.PI*2;
     camYaw+=fd*expLerp(7,dt);
   }
   const rotOff=CAM_OFF.clone().applyAxisAngle(new THREE.Vector3(0,1,0),camYaw);
-  camPos.lerp(player.pos.clone().add(rotOff),expLerp(9,dt));
+
+  // Zoom in if a building is between player and camera
+  const hx=rotOff.x, hz=rotOff.z;
+  const hLen=Math.sqrt(hx*hx+hz*hz);
+  const hdx=hx/hLen, hdz=hz/hLen;
+  let occDist=hLen;
+  for(const [x1,x2,z1,z2] of COLLIDERS){
+    const t=rayAABB(player.pos.x,player.pos.z,hdx,hdz,hLen,x1,x2,z1,z2);
+    if(t<occDist) occDist=Math.max(1.4,t-0.5);
+  }
+  const sc=occDist/hLen;
+  const camTarget=player.pos.clone().add(
+    new THREE.Vector3(rotOff.x*sc, (rotOff.y-1.2)*sc+1.2, rotOff.z*sc)
+  );
+  // Zoom in fast, restore slowly
+  const zoomSpeed=sc<1 ? expLerp(18,dt) : expLerp(5,dt);
+  camPos.lerp(camTarget,zoomSpeed);
   camLook.lerp(player.pos.clone().add(new THREE.Vector3(0,1.4,0)),expLerp(12,dt));
   camera.position.copy(camPos); camera.lookAt(camLook);
 
