@@ -540,7 +540,8 @@ function buildChar({skin,shirt,pants,hatCol,band}){
   const allMats=[mSk,mSh,mPa,mHa,mBa];
   const root=new THREE.Group();
   const torso=cnode(new THREE.CapsuleGeometry(0.30,0.50,8,12),mSh,1.06,root);
-  const head=cnode(new THREE.SphereGeometry(0.27,16,12),mSk,0.53,torso);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.27,16,12),mSk);
+  head.position.y=0.53; head.castShadow=true; torso.add(head);
   const brim=new THREE.Mesh(new THREE.CylinderGeometry(0.46,0.48,0.055,20),mHa);
   brim.position.y=0.14; head.add(brim);
   const crown=new THREE.Mesh(new THREE.CylinderGeometry(0.20,0.27,0.38,12),mHa);
