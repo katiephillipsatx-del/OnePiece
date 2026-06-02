@@ -623,7 +623,7 @@ kobeRig.root.position.set(-2.5,0,23); scene.add(kobeRig.root);
 // Oroz — green hair, green robe, pink sash, katana at hip
 const orozRig=buildChar({skin:0xd4b896,shirt:0x3a7030,pants:0x1e1e28,hatCol:0x20b820,band:0x20b820,noHat:true});
 orozRig.root.position.set(-13,0,-10.5); scene.add(orozRig.root);
-orozRig.root.rotation.y=0;
+orozRig.root.rotation.y=Math.PI;
 orozRig.root.scale.setScalar(1.08);
 // Pink sash over the torso
 const sash=new THREE.Mesh(new THREE.CylinderGeometry(0.315,0.315,0.22,12),new THREE.MeshToonMaterial({color:0xb03070,gradientMap:GRAD}));
@@ -719,7 +719,7 @@ const boss={
   dead:false, fallT:-1, active:false, attackCd:0, walkT:0,
 };
 
-let orozFreed=false, clueFound=false, marinesKilled=0;
+let orozFreed=false, clueFound=false, marinesKilled=0, orozAttackCd=0;
 let gameOver=false, gameWon=false, noraQuest=false, noraFound=false;
 let waterDmgTimer=0;
 
@@ -1091,13 +1091,41 @@ function loop(){
     player.pos.z-kobeRig.root.position.z);
   idleAnim(kobeRig,total+1.3);
 
-  // ── OROZ FOLLOWS AFTER FREED ──
+  // ── OROZ FOLLOWS / FIGHTS AFTER FREED ──
   if(orozFreed){
-    const ot=new THREE.Vector3(player.pos.x+2,0,player.pos.z+0.8);
-    const od=ot.sub(orozRig.root.position);
-    if(od.length()>2.2){ od.normalize(); orozRig.root.position.addScaledVector(od,player.speed*0.84*dt); }
-    orozRig.root.rotation.y=Math.atan2(player.pos.x-orozRig.root.position.x,player.pos.z-orozRig.root.position.z);
-    idleAnim(orozRig,total+2.5);
+    orozAttackCd=Math.max(0,orozAttackCd-dt);
+    if(boss.active&&!boss.dead){
+      // Oroz charges the boss
+      const ob=new THREE.Vector3(boss.pos.x,0,boss.pos.z);
+      const toB=ob.clone().sub(orozRig.root.position);
+      const distB=toB.length();
+      if(distB>1.8){
+        toB.normalize();
+        orozRig.root.position.addScaledVector(toB,2.6*dt);
+        orozRig.root.rotation.y=Math.atan2(toB.x,toB.z);
+        walkAnim(orozRig,total*2.6*3.0);
+      } else {
+        orozRig.root.rotation.y=Math.atan2(boss.pos.x-orozRig.root.position.x,boss.pos.z-orozRig.root.position.z);
+        idleAnim(orozRig,total+2.5);
+        if(orozAttackCd<=0){
+          // Slash the boss
+          boss.hp=Math.max(0,boss.hp-14);
+          boss.flash=0.18; boss.stagger=0.35;
+          setHpBar(bossHpBar,boss.hp/boss.maxHp);
+          spawnSparks(boss.pos.clone().add(new THREE.Vector3(0,2.2,0)));
+          sfx.thud();
+          orozAttackCd=2.8;
+          if(boss.hp<=0&&!boss.dead){ boss.dead=true; boss.fallT=0; sfx.ko(); winGame(); }
+        }
+      }
+    } else {
+      // Follow player when no boss fight
+      const ot=new THREE.Vector3(player.pos.x+2,0,player.pos.z+0.8);
+      const od=ot.clone().sub(orozRig.root.position);
+      if(od.length()>2.2){ od.normalize(); orozRig.root.position.addScaledVector(od,player.speed*0.84*dt); }
+      orozRig.root.rotation.y=Math.atan2(player.pos.x-orozRig.root.position.x,player.pos.z-orozRig.root.position.z);
+      idleAnim(orozRig,total+2.5);
+    }
   } else {
     orozRig.root.position.y=Math.sin(total*0.9)*0.022;
   }
