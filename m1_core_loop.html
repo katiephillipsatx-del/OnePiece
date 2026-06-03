@@ -623,7 +623,7 @@ kobeRig.root.position.set(-2.5,0,23); scene.add(kobeRig.root);
 // Oroz — green hair, green robe, pink sash, katana at hip
 const orozRig=buildChar({skin:0xd4b896,shirt:0x3a7030,pants:0x1e1e28,hatCol:0x20b820,band:0x20b820,noHat:true});
 orozRig.root.position.set(-13,0,-10.5); scene.add(orozRig.root);
-orozRig.root.rotation.y=Math.PI;
+orozRig.root.rotation.y=0;
 orozRig.root.scale.setScalar(1.08);
 // Pink sash over the torso
 const sash=new THREE.Mesh(new THREE.CylinderGeometry(0.315,0.315,0.22,12),new THREE.MeshToonMaterial({color:0xb03070,gradientMap:GRAD}));
@@ -654,25 +654,25 @@ hairDome.position.y=0.18; orozRig.head.add(hairDome);
 const fWhite=new THREE.MeshToonMaterial({color:0xfafafa,gradientMap:GRAD});
 const fDark =new THREE.MeshToonMaterial({color:0x141414,gradientMap:GRAD});
 const fScar =new THREE.MeshToonMaterial({color:0xc08888,gradientMap:GRAD});
-// Eyes (face is on -Z side of head)
-[[-0.09,0.06,-0.235],[0.09,0.06,-0.235]].forEach(([x,y,z],i)=>{
+// Eyes (face is on +Z side of head)
+[[-0.09,0.06,0.235],[0.09,0.06,0.235]].forEach(([x,y,z],i)=>{
   const ew=new THREE.Mesh(new THREE.SphereGeometry(0.046,8,6),fWhite);
   ew.position.set(x,y,z); ew.scale.z=0.32; orozRig.head.add(ew);
   const ep=new THREE.Mesh(new THREE.SphereGeometry(0.027,6,5),fDark);
-  ep.position.set(x,y,z-0.01); ep.scale.z=0.28; orozRig.head.add(ep);
+  ep.position.set(x,y,z+0.01); ep.scale.z=0.28; orozRig.head.add(ep);
   // Stern angled brows
   const eb=new THREE.Mesh(new THREE.BoxGeometry(0.082,0.017,0.008),fDark);
-  eb.position.set(x,y+0.072,z+0.008); eb.rotation.z=(i===0?0.30:-0.30); orozRig.head.add(eb);
+  eb.position.set(x,y+0.072,z-0.008); eb.rotation.z=(i===0?0.30:-0.30); orozRig.head.add(eb);
 });
 // Scar over left eye (vertical slash)
 const scar=new THREE.Mesh(new THREE.BoxGeometry(0.008,0.115,0.008),fScar);
-scar.position.set(-0.09,0.062,-0.238); scar.rotation.z=0.10; orozRig.head.add(scar);
+scar.position.set(-0.09,0.062,0.238); scar.rotation.z=0.10; orozRig.head.add(scar);
 // Mouth — straight stern line
 const mth=new THREE.Mesh(new THREE.BoxGeometry(0.095,0.013,0.008),fDark);
-mth.position.set(0,-0.068,-0.237); orozRig.head.add(mth);
+mth.position.set(0,-0.068,0.237); orozRig.head.add(mth);
 // Nose — small bump
 const nose=new THREE.Mesh(new THREE.SphereGeometry(0.022,6,5),toon(0xc8a07a));
-nose.position.set(0,-0.006,-0.262); orozRig.head.add(nose);
+nose.position.set(0,-0.006,0.262); orozRig.head.add(nose);
 
 const bobRig=buildChar({skin:0xe8c8a0,shirt:0x4a8040,pants:0x2a4020,hatCol:0x4a8040,band:0xffd23f});
 bobRig.root.position.set(-10,0,5); scene.add(bobRig.root);
