@@ -631,13 +631,13 @@ kHairDome.position.y=0.13; kobeRig.head.add(kHairDome);
   kobeRig.head.add(kt);
 });
 // Round glasses on +Z face
-const gMat=new THREE.MeshToonMaterial({color:0x222222,gradientMap:GRAD});
+const gMat=new THREE.MeshToonMaterial({color:0x1a1a1a,gradientMap:GRAD});
 [-0.088,0.088].forEach(x=>{
-  const lens=new THREE.Mesh(new THREE.TorusGeometry(0.048,0.009,8,16),gMat);
-  lens.position.set(x,0.02,0.242); kobeRig.head.add(lens);
+  const lens=new THREE.Mesh(new THREE.TorusGeometry(0.055,0.014,8,20),gMat);
+  lens.position.set(x,0.02,0.275); kobeRig.head.add(lens);
 });
-const bridge=new THREE.Mesh(new THREE.BoxGeometry(0.038,0.007,0.006),gMat);
-bridge.position.set(0,0.02,0.242); kobeRig.head.add(bridge);
+const bridge=new THREE.Mesh(new THREE.BoxGeometry(0.042,0.010,0.010),gMat);
+bridge.position.set(0,0.02,0.275); kobeRig.head.add(bridge);
 
 // Oroz — green hair, green robe, pink sash, katana at hip
 const orozRig=buildChar({skin:0xd4b896,shirt:0x3a7030,pants:0x1e1e28,hatCol:0x20b820,band:0x20b820,noHat:true});
