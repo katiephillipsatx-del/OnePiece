@@ -936,6 +936,14 @@ function doKick(){
 function tickPunch(dt){
   const p=player.punch; if(p.phase==='idle') return;
   p.t+=dt;
+  if(activeRig===orozRig){
+    // Oroz uses sword — skip arm visuals, keep timing for hit detection
+    if(p.phase==='telegraph'&&p.t>=PH.telegraph){p.phase='extend';p.t=0;sfx.whoosh();}
+    else if(p.phase==='extend'&&p.t>=PH.extend){p.phase='hold';p.t=0;checkPunchHits();}
+    else if(p.phase==='hold'&&p.t>=PH.hold){p.phase='recover';p.t=0;}
+    else if(p.phase==='recover'&&p.t>=PH.recover){p.phase='idle';}
+    return;
+  }
   const sp=activeRig.armR.sp, fp=activeRig.armR.fp;
   if(p.phase==='telegraph'){
     const e=ease.inQuad(Math.min(p.t/PH.telegraph,1));
@@ -959,6 +967,14 @@ function tickPunch(dt){
 function tickKick(dt){
   const k=player.kick; if(k.phase==='idle') return;
   k.t+=dt;
+  if(activeRig===orozRig){
+    // Oroz uses sword — skip leg visuals, keep timing for hit detection
+    if(k.phase==='telegraph'&&k.t>=KH.telegraph){k.phase='extend';k.t=0;sfx.whoosh();}
+    else if(k.phase==='extend'&&k.t>=KH.extend){k.phase='hold';k.t=0;checkKickHits();}
+    else if(k.phase==='hold'&&k.t>=KH.hold){k.phase='recover';k.t=0;}
+    else if(k.phase==='recover'&&k.t>=KH.recover){k.phase='idle';}
+    return;
+  }
   const leg=activeRig.legR;
   if(k.phase==='telegraph'){
     const e=ease.inQuad(Math.min(k.t/KH.telegraph,1));
