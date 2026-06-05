@@ -699,14 +699,22 @@ bobRig.root.position.set(-10,0,5); scene.add(bobRig.root);
 // Nora — navigator, hidden until boss defeated
 const noraRig=buildChar({skin:0xf5d0a0,shirt:0xf5f5f5,pants:0xf0a020,hatCol:0xf5f5f5,band:0xf5f5f5,noHat:true});
 noraRig.root.position.set(5,0,28); noraRig.root.visible=false; scene.add(noraRig.root);
-// Orange hair — medium-length, swept look
+// Orange hair — long, flowing past shoulders
 const nHairMat=new THREE.MeshToonMaterial({color:0xe06010,gradientMap:GRAD});
-const nHairDome=new THREE.Mesh(new THREE.SphereGeometry(0.278,12,8,0,Math.PI*2,0,Math.PI*0.56),nHairMat);
-nHairDome.position.y=0.12; noraRig.head.add(nHairDome);
-// Side swept tufts
-[[-0.14,0.18,-0.10],[0.12,0.16,-0.12],[0,0.36,0.04],[-0.10,0.28,0.10]].forEach(([x,y,z])=>{
-  const t=new THREE.Mesh(new THREE.ConeGeometry(0.055,0.14,6),nHairMat);
-  t.position.set(x,y,z); t.rotation.z=x*2.0; noraRig.head.add(t);
+const nHairDome=new THREE.Mesh(new THREE.SphereGeometry(0.285,12,8,0,Math.PI*2,0,Math.PI*0.60),nHairMat);
+nHairDome.position.y=0.10; noraRig.head.add(nHairDome);
+// Long side/back strands hanging down
+[[-0.22,-0.20, 0.04],[ 0.22,-0.20, 0.04],
+ [-0.18,-0.42, 0.06],[ 0.18,-0.42, 0.06],
+ [-0.10,-0.55, 0.00],[ 0.10,-0.55, 0.00],
+ [ 0.00,-0.50, 0.08]].forEach(([x,y,z])=>{
+  const strand=new THREE.Mesh(new THREE.CapsuleGeometry(0.07,0.28,4,6),nHairMat);
+  strand.position.set(x,y,z); strand.rotation.z=x*0.9; noraRig.head.add(strand);
+});
+// Front face fringe tufts
+[[-0.12,0.14,-0.20],[0.10,0.12,-0.20],[0,0.18,-0.22]].forEach(([x,y,z])=>{
+  const t=new THREE.Mesh(new THREE.ConeGeometry(0.052,0.13,6),nHairMat);
+  t.position.set(x,y,z); t.rotation.z=x*1.8; t.rotation.x=0.4; noraRig.head.add(t);
 });
 // Blue stripe on white shirt (horizontal band across torso)
 const stripe1=new THREE.Mesh(new THREE.CylinderGeometry(0.312,0.312,0.10,12),new THREE.MeshToonMaterial({color:0x3060b0,gradientMap:GRAD}));
