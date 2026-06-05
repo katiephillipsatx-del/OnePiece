@@ -697,8 +697,31 @@ const bobRig=buildChar({skin:0xe8c8a0,shirt:0x4a8040,pants:0x2a4020,hatCol:0x4a8
 bobRig.root.position.set(-10,0,5); scene.add(bobRig.root);
 
 // Nora — navigator, hidden until boss defeated
-const noraRig=buildChar({skin:0xd4a07a,shirt:0xe67e30,pants:0x2a3060,hatCol:0xe67e30,band:0xffd23f});
+const noraRig=buildChar({skin:0xf5d0a0,shirt:0xf5f5f5,pants:0xf0a020,hatCol:0xf5f5f5,band:0xf5f5f5,noHat:true});
 noraRig.root.position.set(5,0,28); noraRig.root.visible=false; scene.add(noraRig.root);
+// Orange hair — medium-length, swept look
+const nHairMat=new THREE.MeshToonMaterial({color:0xe06010,gradientMap:GRAD});
+const nHairDome=new THREE.Mesh(new THREE.SphereGeometry(0.278,12,8,0,Math.PI*2,0,Math.PI*0.56),nHairMat);
+nHairDome.position.y=0.12; noraRig.head.add(nHairDome);
+// Side swept tufts
+[[-0.14,0.18,-0.10],[0.12,0.16,-0.12],[0,0.36,0.04],[-0.10,0.28,0.10]].forEach(([x,y,z])=>{
+  const t=new THREE.Mesh(new THREE.ConeGeometry(0.055,0.14,6),nHairMat);
+  t.position.set(x,y,z); t.rotation.z=x*2.0; noraRig.head.add(t);
+});
+// Blue stripe on white shirt (horizontal band across torso)
+const stripe1=new THREE.Mesh(new THREE.CylinderGeometry(0.312,0.312,0.10,12),new THREE.MeshToonMaterial({color:0x3060b0,gradientMap:GRAD}));
+stripe1.position.y=0.08; noraRig.torso.add(stripe1);
+const stripe2=new THREE.Mesh(new THREE.CylinderGeometry(0.312,0.312,0.06,12),new THREE.MeshToonMaterial({color:0x3060b0,gradientMap:GRAD}));
+stripe2.position.y=-0.08; noraRig.torso.add(stripe2);
+// Orange skirt (flared cylinder over hips)
+const skirt=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.38,0.40,14),new THREE.MeshToonMaterial({color:0xf0a020,gradientMap:GRAD}));
+skirt.position.y=0.05; noraRig.hips.add(skirt);
+// Brown boots on legs
+const bootMat=new THREE.MeshToonMaterial({color:0x5a2e10,gradientMap:GRAD});
+[noraRig.legR,noraRig.legL].forEach(leg=>{
+  const boot=new THREE.Mesh(new THREE.CapsuleGeometry(0.10,0.22,6,6),bootMat);
+  boot.position.y=-0.30; leg.shin.add(boot);
+});
 
 // Marines
 const M_SPAWNS=[{x:0,z:12},{x:17,z:0},{x:-10,z:-9},{x:4,z:-5},{x:0,z:-12}];
