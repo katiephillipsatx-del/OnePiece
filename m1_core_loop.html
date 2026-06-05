@@ -1151,12 +1151,8 @@ function loop(){
 
   kobeFaceGroup.scale.z=(activeRig===kobeRig)?-1:1;
   orozFaceGroup.scale.z=(activeRig===orozRig)?-1:1;
-  // Head turn: lag behind player.facing so head swings when changing direction
   if(activeRig===orozRig){
-    let hDiff=player.facing-orozHeadYaw;
-    while(hDiff>Math.PI)hDiff-=Math.PI*2; while(hDiff<-Math.PI)hDiff+=Math.PI*2;
-    orozHeadYaw+=hDiff*expLerp(5,dt);
-    orozRig.head.rotation.y=Math.max(-0.55,Math.min(0.55,orozHeadYaw-player.facing));
+    orozRig.head.rotation.y*=Math.pow(0.01,dt); // snap head to face walk direction
   } else {
     orozRig.head.rotation.y*=0.85;
     orozHeadYaw=orozRig.root.rotation.y;
