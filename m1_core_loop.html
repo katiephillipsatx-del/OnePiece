@@ -769,7 +769,7 @@ const boss={
   dead:false, fallT:-1, active:false, attackCd:0, walkT:0, swingT:-1,
 };
 
-let orozFreed=false, clueFound=false, marinesKilled=0, orozAttackCd=0, orozHeadYaw=0;
+let orozFreed=false, clueFound=false, marinesKilled=0, orozAttackCd=0, orozHeadYaw=0, orozSwingT=-1;
 let activeCharIdx=0, activeRig=playerRig;
 const CHARS=[
   {rig:playerRig, name:'JENSOON'},
@@ -1182,6 +1182,25 @@ function loop(){
 
   kobeFaceGroup.scale.z=(activeRig===kobeRig)?-1:1;
   orozFaceGroup.position.z=(activeRig===orozRig)?-0.47:0;
+  // Sword swing animation
+  if(orozSwingT>=0){
+    orozSwingT=Math.min(orozSwingT+dt,1.0);
+    const s=orozSwingT;
+    if(s<0.20){        // windup — raise sword up behind
+      const p=s/0.20;
+      oSword.rotation.z=0.38-p*1.8;
+      oSword.rotation.x=-p*1.2;
+    } else if(s<0.50){ // slash — sweep down and forward
+      const p=(s-0.20)/0.30;
+      oSword.rotation.z=-1.42+p*2.6;
+      oSword.rotation.x=-1.2+p*2.0;
+    } else {           // recover — back to hip rest
+      const p=(s-0.50)/0.50;
+      oSword.rotation.z=(1.18)*(1-p)+0.38*p;
+      oSword.rotation.x=(0.8)*(1-p);
+    }
+    if(orozSwingT>=1.0){ orozSwingT=-1; oSword.rotation.set(0,0.38,0); }
+  }
   if(activeRig===orozRig){
     orozRig.head.rotation.y*=Math.pow(0.01,dt); // snap head to face walk direction
   } else {
@@ -1212,7 +1231,7 @@ function loop(){
           setHpBar(bossHpBar,boss.hp/boss.maxHp);
           spawnSparks(boss.pos.clone().add(new THREE.Vector3(0,2.2,0)));
           sfx.thud();
-          orozAttackCd=2.8;
+          orozAttackCd=2.8; orozSwingT=0;
           if(boss.hp<=0&&!boss.dead){ boss.dead=true; boss.fallT=0; sfx.ko(); winGame(); }
         }
       }
