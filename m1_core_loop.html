@@ -1150,7 +1150,7 @@ function loop(){
   }
 
   kobeFaceGroup.scale.z=(activeRig===kobeRig)?-1:1;
-  orozFaceGroup.scale.z=(activeRig===orozRig)?-1:1;
+  orozFaceGroup.position.z=(activeRig===orozRig)?-0.47:0;
   if(activeRig===orozRig){
     orozRig.head.rotation.y*=Math.pow(0.01,dt); // snap head to face walk direction
   } else {
