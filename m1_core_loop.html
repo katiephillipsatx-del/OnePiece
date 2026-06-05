@@ -766,7 +766,7 @@ const player={
 const boss={
   pos:new THREE.Vector3(0,0,-14), hp:250, maxHp:250,
   kbVel:new THREE.Vector3(), flash:0, stagger:0, bobT:0,
-  dead:false, fallT:-1, active:false, attackCd:0, walkT:0,
+  dead:false, fallT:-1, active:false, attackCd:0, walkT:0, swingT:-1,
 };
 
 let orozFreed=false, clueFound=false, marinesKilled=0, orozAttackCd=0, orozHeadYaw=0;
@@ -1330,13 +1330,31 @@ function loop(){
       boss.pos.addScaledVector(toP,2.2*dt);
       boss.walkT+=dt*2.2*3.0; walkAnim(bossRig,boss.walkT);
     } else {
-      if(boss.attackCd<=0){ damagePlayer(8); boss.attackCd=2.4; sfx.boss(); }
+      if(boss.attackCd<=0){ damagePlayer(8); boss.attackCd=2.4; boss.swingT=0; sfx.boss(); }
       idleAnim(bossRig,boss.bobT);
     }
     boss.flash=Math.max(0,boss.flash-dt);
     setEmissive(bossRig.allMats,boss.flash>0?0.8:0,0,0);
     boss.stagger=Math.max(0,boss.stagger-dt);
     bossRig.torso.rotation.x=boss.stagger>0?Math.sin((1-boss.stagger/0.42)*Math.PI)*0.5:bossRig.torso.rotation.x*0.88;
+    // Axe swing animation
+    if(boss.swingT>=0){
+      boss.swingT=Math.min(boss.swingT+dt,1.0);
+      const s=boss.swingT;
+      if(s<0.25){        // windup — raise axe back
+        bossRig.axeGroup.rotation.x=-(s/0.25)*1.6;
+        bossRig.axeGroup.rotation.z= (s/0.25)*0.5;
+      } else if(s<0.55){ // slash — swing down hard
+        const p=(s-0.25)/0.30;
+        bossRig.axeGroup.rotation.x=-1.6+p*3.4;
+        bossRig.axeGroup.rotation.z= 0.5-p*0.8;
+      } else {           // recover — return to rest
+        const p=(s-0.55)/0.45;
+        bossRig.axeGroup.rotation.x=(1.8)*(1-p);
+        bossRig.axeGroup.rotation.z=(-0.3)*(1-p);
+      }
+      if(boss.swingT>=1.0){ boss.swingT=-1; bossRig.axeGroup.rotation.set(0,0,0); }
+    }
     bossRig.root.position.set(boss.pos.x,boss.pos.y,boss.pos.z);
     bossRig.root.rotation.y=Math.atan2(player.pos.x-boss.pos.x,player.pos.z-boss.pos.z);
     bossHpBar.bg.lookAt(camera.position);
