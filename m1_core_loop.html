@@ -618,8 +618,26 @@ function setHpBar(bar,pct){
 const playerRig=buildChar({skin:0xc8845a,shirt:0xe63946,pants:0x1a3a6a,hatCol:0xd4a843,band:0xe63946});
 playerRig.root.position.set(0,0,22); scene.add(playerRig.root);
 
-const kobeRig=buildChar({skin:0xc8a880,shirt:0x2a3550,pants:0x1a2040,hatCol:0x2a3550,band:0xe63946});
+const kobeRig=buildChar({skin:0xf5d4b0,shirt:0xfafafa,pants:0x1a1a3a,hatCol:0xfafafa,band:0xfafafa,noHat:true});
 kobeRig.root.position.set(-2.5,0,23); scene.add(kobeRig.root);
+// Pink hair — short dome
+const kHairMat=new THREE.MeshToonMaterial({color:0xff7aaa,gradientMap:GRAD});
+const kHairDome=new THREE.Mesh(new THREE.SphereGeometry(0.278,12,8,0,Math.PI*2,0,Math.PI*0.54),kHairMat);
+kHairDome.position.y=0.13; kobeRig.head.add(kHairDome);
+// A few small pink tufts for texture
+[-0.08,0,0.08].forEach((ox,i)=>{
+  const kt=new THREE.Mesh(new THREE.ConeGeometry(0.045,0.10,6),kHairMat);
+  kt.position.set(ox,0.32+Math.abs(i-1)*0.02,0); kt.rotation.z=(i-1)*0.18;
+  kobeRig.head.add(kt);
+});
+// Round glasses on +Z face
+const gMat=new THREE.MeshToonMaterial({color:0x222222,gradientMap:GRAD});
+[-0.088,0.088].forEach(x=>{
+  const lens=new THREE.Mesh(new THREE.TorusGeometry(0.048,0.009,8,16),gMat);
+  lens.position.set(x,0.02,0.242); kobeRig.head.add(lens);
+});
+const bridge=new THREE.Mesh(new THREE.BoxGeometry(0.038,0.007,0.006),gMat);
+bridge.position.set(0,0.02,0.242); kobeRig.head.add(bridge);
 
 // Oroz — green hair, green robe, pink sash, katana at hip
 const orozRig=buildChar({skin:0xd4b896,shirt:0x3a7030,pants:0x1e1e28,hatCol:0x20b820,band:0x20b820,noHat:true});
