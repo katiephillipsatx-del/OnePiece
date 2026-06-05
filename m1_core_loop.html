@@ -738,7 +738,7 @@ const boss={
   dead:false, fallT:-1, active:false, attackCd:0, walkT:0,
 };
 
-let orozFreed=false, clueFound=false, marinesKilled=0, orozAttackCd=0;
+let orozFreed=false, clueFound=false, marinesKilled=0, orozAttackCd=0, orozHeadYaw=0;
 let activeCharIdx=0, activeRig=playerRig;
 const CHARS=[
   {rig:playerRig, name:'JENSOON'},
@@ -1151,6 +1151,16 @@ function loop(){
 
   kobeFaceGroup.scale.z=(activeRig===kobeRig)?-1:1;
   orozFaceGroup.scale.z=(activeRig===orozRig)?-1:1;
+  // Head turn: lag behind player.facing so head swings when changing direction
+  if(activeRig===orozRig){
+    let hDiff=player.facing-orozHeadYaw;
+    while(hDiff>Math.PI)hDiff-=Math.PI*2; while(hDiff<-Math.PI)hDiff+=Math.PI*2;
+    orozHeadYaw+=hDiff*expLerp(5,dt);
+    orozRig.head.rotation.y=Math.max(-0.55,Math.min(0.55,orozHeadYaw-player.facing));
+  } else {
+    orozRig.head.rotation.y*=0.85;
+    orozHeadYaw=orozRig.root.rotation.y;
+  }
 
   // ── OROZ FOLLOWS / FIGHTS AFTER FREED ──
   if(orozFreed&&activeRig!==orozRig){
