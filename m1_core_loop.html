@@ -1124,6 +1124,20 @@ function loop(){
     if(dmgFlash.style.background.startsWith('rgba(20')){ dmgFlash.style.background='rgba(230,57,70,0)'; }
   }
 
+  // ── JENSOON FOLLOWS (when not active) ──
+  if(activeRig!==playerRig){
+    const jTarget=new THREE.Vector3(player.pos.x+1.5,0,player.pos.z+1.0);
+    const jDelta=jTarget.clone().sub(playerRig.root.position);
+    if(jDelta.length()>2.2){
+      jDelta.normalize();
+      playerRig.root.position.addScaledVector(jDelta,player.speed*0.88*dt);
+    }
+    playerRig.root.rotation.y=Math.atan2(
+      player.pos.x-playerRig.root.position.x,
+      player.pos.z-playerRig.root.position.z);
+    idleAnim(playerRig,total+0.7);
+  }
+
   // ── KOBE FOLLOWS ──
   if(activeRig!==kobeRig&&kobeRig.root.visible){
     const kobeTarget=new THREE.Vector3(player.pos.x-2,0,player.pos.z+1.2);
