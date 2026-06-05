@@ -923,12 +923,14 @@ function doPunch(){
   if(gameOver||gameWon||player.punch.phase!=='idle') return;
   player.punch.phase='telegraph'; player.punch.t=0;
   player.punch.dir.set(-Math.sin(player.facing),0,-Math.cos(player.facing));
+  if(activeRig===orozRig) orozSwingT=0;
   if(!hintShown){hintShown=true;hintEl.style.opacity='0';}
 }
 function doKick(){
   if(gameOver||gameWon||player.kick.phase!=='idle') return;
   player.kick.phase='telegraph'; player.kick.t=0;
   player.kick.dir.set(-Math.sin(player.facing),0,-Math.cos(player.facing));
+  if(activeRig===orozRig) orozSwingT=0;
 }
 
 function tickPunch(dt){
