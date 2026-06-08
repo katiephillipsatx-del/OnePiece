@@ -604,11 +604,11 @@ function buildBoss(){
   // White cape draped over shoulders
   const capeMat=new THREE.MeshToonMaterial({color:0xf2f2f2,gradientMap:GRAD});
   // Half-cylinder: thetaStart=0, thetaLength=PI covers back (+Z) side only
-  const capeBody=new THREE.Mesh(new THREE.CylinderGeometry(0.72,0.62,1.05,14,1,false,Math.PI,Math.PI),capeMat);
-  capeBody.position.set(0,-0.15,0.08); ch.torso.add(capeBody);
+  const capeBody=new THREE.Mesh(new THREE.CylinderGeometry(0.72,0.62,1.05,14,1,false,Math.PI*0.5,Math.PI),capeMat);
+  capeBody.position.set(0,-0.15,0); ch.torso.add(capeBody);
   // Cape collar — back half only
-  const collar=new THREE.Mesh(new THREE.CylinderGeometry(0.52,0.72,0.18,14,1,false,Math.PI,Math.PI),capeMat);
-  collar.position.set(0,0.44,0.08); ch.torso.add(collar);
+  const collar=new THREE.Mesh(new THREE.CylinderGeometry(0.52,0.72,0.18,14,1,false,Math.PI*0.5,Math.PI),capeMat);
+  collar.position.set(0,0.44,0); ch.torso.add(collar);
 
   // Gold epaulettes on each shoulder
   const epMat=new THREE.MeshToonMaterial({color:0xe8c030,gradientMap:GRAD});
