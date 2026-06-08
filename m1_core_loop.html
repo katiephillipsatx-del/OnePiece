@@ -772,8 +772,12 @@ const bootMat=new THREE.MeshToonMaterial({color:0x5a2e10,gradientMap:GRAD});
 // Marines
 const M_SPAWNS=[{x:0,z:12},{x:17,z:0},{x:-10,z:-9},{x:4,z:-5},{x:0,z:-12}];
 const marines=M_SPAWNS.map(({x,z},i)=>{
-  const rig=buildChar({skin:0xc8a87a,shirt:0x2a3550,pants:0x1a2235,hatCol:0x2a3550,band:0xffd23f});
+  const rig=buildChar({skin:0x7a4a28,shirt:0xf0f0f0,pants:0x1a2040,hatCol:0xf0f0f0,band:0xf0f0f0});
   rig.root.position.set(x,0,z); scene.add(rig.root);
+  // Blue neckerchief around neck
+  const neckMat=new THREE.MeshToonMaterial({color:0x2060c0,gradientMap:GRAD});
+  const neck=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.30,0.22,10),neckMat);
+  neck.position.y=0.30; rig.torso.add(neck);
   const hpBar=makeHpBar(rig.root,3.1,1.3);
   return {
     rig, hpBar, pos:new THREE.Vector3(x,0,z),
