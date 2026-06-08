@@ -589,15 +589,52 @@ function buildChar({skin,shirt,pants,hatCol,band,noHat=false}){
 
 // Boss rig — same base, with axe arm
 function buildBoss(){
-  const ch=buildChar({skin:0xc09050,shirt:0x1a2030,pants:0x1a2030,hatCol:0x1a2030,band:0xe63946});
+  const ch=buildChar({skin:0xc8905a,shirt:0x2a1a50,pants:0x1a2248,hatCol:0x2a1a50,band:0x2a1a50,noHat:true});
   ch.root.scale.setScalar(1.38);
-  // Replace right arm with axe
+
+  // Gray spiky hair
+  const hairMat=new THREE.MeshToonMaterial({color:0xc8c8c8,gradientMap:GRAD});
+  const hairDome=new THREE.Mesh(new THREE.SphereGeometry(0.285,12,8,0,Math.PI*2,0,Math.PI*0.58),hairMat);
+  hairDome.position.y=0.10; ch.head.add(hairDome);
+  [[-0.14,0.32,0.02],[0.12,0.34,0.02],[0,0.40,-0.04],[-0.08,0.28,-0.10],[0.10,0.26,-0.08]].forEach(([x,y,z])=>{
+    const sp=new THREE.Mesh(new THREE.ConeGeometry(0.055,0.18,5),hairMat);
+    sp.position.set(x,y,z); sp.rotation.z=x*1.8; ch.head.add(sp);
+  });
+
+  // White cape draped over shoulders
+  const capeMat=new THREE.MeshToonMaterial({color:0xf2f2f2,gradientMap:GRAD});
+  const capeBody=new THREE.Mesh(new THREE.CylinderGeometry(0.72,0.62,1.05,14),capeMat);
+  capeBody.position.y=-0.15; ch.torso.add(capeBody);
+  // Cape collar/shoulder pad
+  const collar=new THREE.Mesh(new THREE.CylinderGeometry(0.52,0.72,0.18,14),capeMat);
+  collar.position.y=0.44; ch.torso.add(collar);
+
+  // Gold epaulettes on each shoulder
+  const epMat=new THREE.MeshToonMaterial({color:0xe8c030,gradientMap:GRAD});
+  [-0.44,0.44].forEach(x=>{
+    const ep=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.14,0.10,8),epMat);
+    ep.position.set(x,0.28,0); ch.torso.add(ep);
+    const fringe=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.14,0.14,8),epMat);
+    fringe.position.set(x,0.16,0); ch.torso.add(fringe);
+  });
+
+  // Brown boots
+  const bootMat=new THREE.MeshToonMaterial({color:0x6a3a18,gradientMap:GRAD});
+  [ch.legR,ch.legL].forEach(leg=>{
+    const boot=new THREE.Mesh(new THREE.CapsuleGeometry(0.105,0.24,4,6),bootMat);
+    boot.position.y=-0.30; leg.shin.add(boot);
+  });
+
+  // Replace right arm with large axe
   ch.torso.remove(ch.armR.sp);
   const axe=new THREE.Group(); axe.position.set(0.41,0.22,0); ch.torso.add(axe);
-  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,1.0,8),pbr(0x504838,0.7,0.2));
-  shaft.position.y=-0.5; axe.add(shaft);
-  const blade=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.44,0.5,6),pbr(0xb8c0c8,0.25,0.85));
-  blade.position.set(0,-1.08,0); blade.rotation.z=Math.PI/2; axe.add(blade);
+  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,1.1,8),pbr(0x4a3828,0.8,0.1));
+  shaft.position.y=-0.55; axe.add(shaft);
+  // Large crescent blade
+  const blade=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.58,0.55,7),pbr(0xd0d8e0,0.15,0.9));
+  blade.position.set(0,-1.18,0); blade.rotation.z=Math.PI/2; axe.add(blade);
+  const blade2=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.30,0.28,7),pbr(0xd0d8e0,0.15,0.9));
+  blade2.position.set(0,-0.70,0); blade2.rotation.z=-Math.PI/2; axe.add(blade2);
   ch.axeGroup=axe;
   return ch;
 }
