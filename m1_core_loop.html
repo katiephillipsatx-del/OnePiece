@@ -66,6 +66,7 @@ canvas { display:block; }
 #cutscene-end h1 { font-family:Impact,sans-serif; font-size:52px; color:#ffd23f; letter-spacing:6px; opacity:0; transition:opacity 1.2s ease 0.8s; margin-bottom:14px; }
 #cutscene-end p  { font-family:'Courier New',monospace; color:rgba(251,247,236,0.75); letter-spacing:3px; font-size:13px; opacity:0; transition:opacity 1.2s ease 1.4s; }
 #cutscene-end.dark h1, #cutscene-end.dark p { opacity:1; }
+#cut-sub { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); font-family:'Courier New',monospace; font-size:13px; letter-spacing:2px; color:#ffd23f; text-shadow:0 2px 8px rgba(0,0,0,0.9); opacity:0; transition:opacity 0.4s; pointer-events:none; z-index:250; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -129,6 +130,7 @@ canvas { display:block; }
   <h1>TO BE CONTINUED...</h1>
   <p>THE CREW HAS BEEN CAPTURED BY MYSTERIOUS RED SMOKE</p>
 </div>
+<div id="cut-sub"></div>
 
 <script type="importmap">
 {"imports":{
@@ -809,7 +811,33 @@ ring.position.set(-0.5,1.9,1.52); ring.rotation.y=Math.PI/2; cutShip.add(ring);
 
 // Small crew silhouettes on deck (will fall when smoke hits)
 const cutCrewFigs=[];
-[{x:-0.8,z:-0.6},{x:0.5,z:0.5},{x:1.8,z:-0.3},{x:-1.8,z:0.4}].forEach(({x,z})=>{
+// First figure = Jensoon (straw hat + holds map)
+const jFig=new THREE.Group(); jFig.position.set(1.8,1.75,-0.3);
+const jBody=new THREE.Mesh(new THREE.CapsuleGeometry(0.13,0.36,4,6),toon(0xe63946));
+jBody.position.y=0.28; jFig.add(jBody);
+const jHead=new THREE.Mesh(new THREE.SphereGeometry(0.13,8,6),toon(0xf5d0a0));
+jHead.position.y=0.68; jFig.add(jHead);
+// Straw hat brim
+const jHat=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.23,0.04,12),toon(0xe8c84a));
+jHat.position.y=0.81; jFig.add(jHat);
+const jCrown=new THREE.Mesh(new THREE.CylinderGeometry(0.10,0.13,0.16,10),toon(0xe8c84a));
+jCrown.position.y=0.87; jFig.add(jCrown);
+// Right arm (will raise for map animation)
+const jArmGroup=new THREE.Group(); jArmGroup.position.set(0.16,0.50,0); jFig.add(jArmGroup);
+const jArm=new THREE.Mesh(new THREE.CapsuleGeometry(0.055,0.20,4,6),toon(0xf5d0a0));
+jArm.position.y=-0.14; jArmGroup.add(jArm);
+// Map — small folded paper
+const mapMesh=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.12,0.02),toon(0xf5e8a0));
+mapMesh.position.y=-0.30; jArmGroup.add(mapMesh);
+const mapLine1=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.008,0.022),toon(0x8a6020));
+mapLine1.position.set(0,-0.295,0); jArmGroup.add(mapLine1);
+const mapLine2=new THREE.Mesh(new THREE.BoxGeometry(0.008,0.10,0.022),toon(0x8a6020));
+mapLine2.position.set(0,-0.295,0); jArmGroup.add(mapLine2);
+cutShip.add(jFig);
+cutCrewFigs.push({g:jFig,fallen:false,isJensoon:true,armGroup:jArmGroup,mapParts:[mapMesh,mapLine1,mapLine2]});
+
+// Other crew figures
+[{x:-0.8,z:-0.6},{x:0.5,z:0.5},{x:-1.8,z:0.4}].forEach(({x,z})=>{
   const fig=new THREE.Group(); fig.position.set(x,1.75,z);
   const body=new THREE.Mesh(new THREE.CapsuleGeometry(0.13,0.36,4,6),toon(0x334455));
   body.position.y=0.28; fig.add(body);
@@ -839,16 +867,23 @@ function spawnSmk(){
 }
 
 // Cutscene state
-let cutsceneActive=false, cutsceneT=0, smkTimer=0, smkOn=false;
+let cutsceneActive=false, cutsceneT=0, smkTimer=0, smkOn=false, mapSwallowed=false;
 const cutsceneEl=document.getElementById('cutscene-end');
+const cutSubEl=document.getElementById('cut-sub');
+function showSub(txt,dur=2.5){ cutSubEl.textContent=txt; cutSubEl.style.opacity='1'; clearTimeout(cutSubEl._t); cutSubEl._t=setTimeout(()=>cutSubEl.style.opacity='0',dur*1000); }
 
 function startCutscene(){
-  cutsceneActive=true; cutsceneT=0; smkOn=false; smkTimer=0;
+  cutsceneActive=true; cutsceneT=0; smkOn=false; smkTimer=0; mapSwallowed=false;
   cutShip.visible=true;
   cutShip.position.set(55,-0.5,5); cutShip.rotation.y=-0.18;
-  cutCrewFigs.forEach(f=>{f.g.rotation.z=0;f.g.position.y=1.75;f.fallen=false;});
+  cutCrewFigs.forEach(f=>{
+    f.g.rotation.z=0; f.g.position.y=1.75; f.fallen=false;
+    if(f.armGroup) f.armGroup.rotation.x=0;
+    if(f.mapParts) f.mapParts.forEach(m=>m.visible=true);
+  });
   smokePool.forEach(p=>{p.life=-1;p.m.visible=false;p.m.material.opacity=0;});
   cutsceneEl.className=''; cutsceneEl.style.display='none';
+  cutSubEl.style.opacity='0';
 }
 
 // Marines
@@ -1587,11 +1622,23 @@ function loop(){
       if(p.life>p.ml){ p.life=-1; p.m.visible=false; }
     });
 
+    // Jensoon raises map to mouth (t=3.2 – 4.2) then swallows it
+    const jf=cutCrewFigs[0];
+    if(ct>3.2 && ct<4.2){
+      const p=Math.min((ct-3.2)/0.6,1);
+      jf.armGroup.rotation.x=-p*2.2; // raise arm up toward head
+      if(p>0.3 && !mapSwallowed){
+        showSub('JENSOON SWALLOWS THE MAP TO PROTECT IT!', 2.0);
+      }
+    }
+    if(ct>3.9 && !mapSwallowed){
+      mapSwallowed=true;
+      if(jf.mapParts) jf.mapParts.forEach(m=>m.visible=false); // map gone (swallowed)
+    }
+
     // Crew passes out at t=4.5
     cutCrewFigs.forEach((f,i)=>{
-      if(!f.fallen && ct>4.5+i*0.35){
-        f.fallen=true;
-      }
+      if(!f.fallen && ct>4.5+i*0.35){ f.fallen=true; }
       if(f.fallen){
         f.g.rotation.z=Math.min(f.g.rotation.z+dt*2.8, Math.PI/2);
         f.g.position.y=Math.max(1.75-f.g.rotation.z*0.38, 1.2);
