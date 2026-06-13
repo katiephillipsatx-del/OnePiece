@@ -59,6 +59,13 @@ canvas { display:block; }
 #gameover h1 { font-family:Impact,sans-serif; font-size:64px; color:#e63946; letter-spacing:6px; margin-bottom:20px; }
 .restart { background:rgba(230,57,70,0.15); border:1.5px solid #e63946; color:#e63946; font-family:'Courier New',monospace; font-size:13px; letter-spacing:3px; padding:12px 36px; border-radius:4px; cursor:pointer; }
 .restart:hover { background:rgba(230,57,70,0.3); }
+/* Cutscene end card */
+#cutscene-end { position:fixed; inset:0; background:rgba(0,0,0,0); display:none; align-items:center; justify-content:center; flex-direction:column; z-index:300; transition:background 1.5s ease; pointer-events:none; }
+#cutscene-end.active { display:flex; }
+#cutscene-end.dark { background:rgba(0,0,0,0.95); pointer-events:all; }
+#cutscene-end h1 { font-family:Impact,sans-serif; font-size:52px; color:#ffd23f; letter-spacing:6px; opacity:0; transition:opacity 1.2s ease 0.8s; margin-bottom:14px; }
+#cutscene-end p  { font-family:'Courier New',monospace; color:rgba(251,247,236,0.75); letter-spacing:3px; font-size:13px; opacity:0; transition:opacity 1.2s ease 1.4s; }
+#cutscene-end.dark h1, #cutscene-end.dark p { opacity:1; }
 </style>
 </head>
 <body>
@@ -117,6 +124,10 @@ canvas { display:block; }
 <div id="gameover">
   <h1>FALLEN</h1>
   <button class="restart" onclick="location.reload()">TRY AGAIN</button>
+</div>
+<div id="cutscene-end">
+  <h1>TO BE CONTINUED...</h1>
+  <p>THE CREW HAS BEEN CAPTURED BY MYSTERIOUS RED SMOKE</p>
 </div>
 
 <script type="importmap">
@@ -752,6 +763,94 @@ const bootMat=new THREE.MeshToonMaterial({color:0x5a2e10,gradientMap:GRAD});
   boot.position.y=-0.30; leg.shin.add(boot);
 });
 
+// ── CUTSCENE SHIP ────────────────────────────────────────────
+const cutShip=new THREE.Group(); cutShip.visible=false;
+cutShip.position.set(55,-0.5,5); scene.add(cutShip);
+
+// Green hull bottom with yellow triangle trim
+const hullBot=new THREE.Mesh(new THREE.BoxGeometry(8,1.2,3.0),toon(0x228840));
+hullBot.position.y=-0.4; cutShip.add(hullBot);
+// Yellow triangle trim strip
+const trim=new THREE.Mesh(new THREE.BoxGeometry(8.1,0.28,3.1),toon(0xf0c000));
+trim.position.y=0.22; cutShip.add(trim);
+// Dark wood upper hull
+const hullTop=new THREE.Mesh(new THREE.BoxGeometry(8,1.1,2.9),toon(0x3a2510));
+hullTop.position.y=1.05; cutShip.add(hullTop);
+// Deck
+const deck=new THREE.Mesh(new THREE.BoxGeometry(7.8,0.18,2.7),toon(0x6a4520));
+deck.position.y=1.66; cutShip.add(deck);
+// Bow (pointed front, green)
+const bow=new THREE.Mesh(new THREE.ConeGeometry(1.5,2.4,4),toon(0x228840));
+bow.position.set(4.8,0.0,0); bow.rotation.z=-Math.PI/2; cutShip.add(bow);
+// Cabin structure at back
+const cabin=new THREE.Mesh(new THREE.BoxGeometry(2.5,1.4,2.6),toon(0x3a2510));
+cabin.position.set(-2.5,2.43,0); cutShip.add(cabin);
+const cabinRoof=new THREE.Mesh(new THREE.BoxGeometry(2.6,0.2,2.7),toon(0x4a3520));
+cabinRoof.position.set(-2.5,3.2,0); cutShip.add(cabinRoof);
+
+// Mast
+const mastMat=toon(0x4a3010);
+const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.14,8.5,8),mastMat);
+mast.position.set(1.0,5.5,0); cutShip.add(mast);
+const boom=new THREE.Mesh(new THREE.CylinderGeometry(0.065,0.065,5.5,8),mastMat);
+boom.position.set(1.0,7.2,0); boom.rotation.z=Math.PI/2; cutShip.add(boom);
+
+// Red & white striped sail (alternating strips)
+const sailGroup=new THREE.Group(); sailGroup.position.set(1.0,5.5,0.05); cutShip.add(sailGroup);
+for(let s=0;s<8;s++){
+  const col=s%2===0?0xdd1818:0xf5f0e8;
+  const strip=new THREE.Mesh(new THREE.PlaneGeometry(0.66,4.5),new THREE.MeshToonMaterial({color:col,side:THREE.DoubleSide,gradientMap:GRAD}));
+  strip.position.set(-2.31+s*0.66,1.7,0); sailGroup.add(strip);
+}
+
+// Life preserver ring on side
+const ring=new THREE.Mesh(new THREE.TorusGeometry(0.32,0.09,8,16),toon(0xe63050));
+ring.position.set(-0.5,1.9,1.52); ring.rotation.y=Math.PI/2; cutShip.add(ring);
+
+// Small crew silhouettes on deck (will fall when smoke hits)
+const cutCrewFigs=[];
+[{x:-0.8,z:-0.6},{x:0.5,z:0.5},{x:1.8,z:-0.3},{x:-1.8,z:0.4}].forEach(({x,z})=>{
+  const fig=new THREE.Group(); fig.position.set(x,1.75,z);
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(0.13,0.36,4,6),toon(0x334455));
+  body.position.y=0.28; fig.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.13,8,6),toon(0xc8a060));
+  head.position.y=0.68; fig.add(head);
+  cutShip.add(fig);
+  cutCrewFigs.push({g:fig,fallen:false});
+});
+
+// Red smoke pool
+const SMOKE_N=24;
+const smokePool=[];
+for(let i=0;i<SMOKE_N;i++){
+  const sm=new THREE.Mesh(new THREE.SphereGeometry(0.5,6,5),
+    new THREE.MeshBasicMaterial({color:0xdd1010,transparent:true,opacity:0,depthWrite:false,side:THREE.FrontSide}));
+  sm.visible=false; cutShip.add(sm);
+  smokePool.push({m:sm,life:-1,ml:2,vx:0,vy:0,vz:0});
+}
+function spawnSmk(){
+  const p=smokePool.find(s=>s.life<0); if(!p)return;
+  p.m.visible=true;
+  p.m.position.set((Math.random()-0.5)*5,2.2+Math.random()*1.5,(Math.random()-0.5)*1.5);
+  p.m.scale.setScalar(0.6+Math.random()*0.6);
+  p.m.material.opacity=0.72;
+  p.life=0; p.ml=1.8+Math.random()*0.9;
+  p.vx=(Math.random()-0.5)*0.5; p.vy=1.0+Math.random()*0.7; p.vz=(Math.random()-0.5)*0.3;
+}
+
+// Cutscene state
+let cutsceneActive=false, cutsceneT=0, smkTimer=0, smkOn=false;
+const cutsceneEl=document.getElementById('cutscene-end');
+
+function startCutscene(){
+  cutsceneActive=true; cutsceneT=0; smkOn=false; smkTimer=0;
+  cutShip.visible=true;
+  cutShip.position.set(55,-0.5,5); cutShip.rotation.y=-0.18;
+  cutCrewFigs.forEach(f=>{f.g.rotation.z=0;f.g.position.y=1.75;f.fallen=false;});
+  smokePool.forEach(p=>{p.life=-1;p.m.visible=false;p.m.material.opacity=0;});
+  cutsceneEl.className=''; cutsceneEl.style.display='none';
+}
+
 // Marines
 const M_SPAWNS=[{x:0,z:12},{x:17,z:0},{x:-10,z:-9},{x:4,z:-5},{x:0,z:-12}];
 const marines=M_SPAWNS.map(({x,z},i)=>{
@@ -936,6 +1035,7 @@ function tryInteract(){
       QEL[4].classList.add('done');
       document.getElementById('cm-nora').style.display='';
       sfx.unlock();
+      setTimeout(startCutscene, 800);
     });
   }
 }
@@ -1455,6 +1555,60 @@ function loop(){
   );
   // Zoom in fast, restore slowly
   const zoomSpeed=sc<1 ? expLerp(18,dt) : expLerp(5,dt);
+  // ── CUTSCENE ──
+  if(cutsceneActive){
+    cutsceneT+=dt;
+    const ct=cutsceneT;
+
+    // Ship sails away (starts moving at t=1)
+    if(ct>1) cutShip.position.x+=dt*3.5;
+
+    // Camera locks onto ship from a cinematic angle
+    const cinTarget=new THREE.Vector3(cutShip.position.x-18,9,cutShip.position.z+16);
+    const cinLook=new THREE.Vector3(cutShip.position.x,2,cutShip.position.z);
+    camPos.lerp(cinTarget,expLerp(3,dt));
+    camLook.lerp(cinLook,expLerp(3,dt));
+
+    // Red smoke starts at t=3
+    if(ct>3){ smkOn=true; }
+    if(smkOn){
+      smkTimer-=dt;
+      if(smkTimer<=0){ spawnSmk(); smkTimer=0.08; }
+    }
+
+    // Update smoke particles
+    smokePool.forEach(p=>{
+      if(p.life<0) return;
+      p.life+=dt;
+      const pr=p.life/p.ml;
+      p.m.position.x+=p.vx*dt; p.m.position.y+=p.vy*dt; p.m.position.z+=p.vz*dt;
+      p.m.scale.setScalar((0.6+pr*2.5)*p.m.scale.x>0?p.m.scale.x+dt*1.8:1);
+      p.m.material.opacity=Math.max(0,0.72*(1-pr*pr));
+      if(p.life>p.ml){ p.life=-1; p.m.visible=false; }
+    });
+
+    // Crew passes out at t=4.5
+    cutCrewFigs.forEach((f,i)=>{
+      if(!f.fallen && ct>4.5+i*0.35){
+        f.fallen=true;
+      }
+      if(f.fallen){
+        f.g.rotation.z=Math.min(f.g.rotation.z+dt*2.8, Math.PI/2);
+        f.g.position.y=Math.max(1.75-f.g.rotation.z*0.38, 1.2);
+      }
+    });
+
+    // Fade to black at t=7, show end card at t=8
+    if(ct>7 && cutsceneEl.style.display==='none'){
+      cutsceneEl.style.display='flex';
+      requestAnimationFrame(()=>cutsceneEl.classList.add('active'));
+      setTimeout(()=>cutsceneEl.classList.add('dark'), 100);
+    }
+
+    camera.position.copy(camPos); camera.lookAt(camLook);
+    composer.render(); return;
+  }
+
   camPos.lerp(camTarget,zoomSpeed);
   camLook.lerp(player.pos.clone().add(new THREE.Vector3(0,1.4,0)),expLerp(12,dt));
   camera.position.copy(camPos); camera.lookAt(camLook);
