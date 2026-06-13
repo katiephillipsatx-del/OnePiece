@@ -1598,11 +1598,26 @@ function loop(){
     // Ship sails away (starts moving at t=1)
     if(ct>1) cutShip.position.x+=dt*3.5;
 
-    // Camera locks onto ship from a cinematic angle
-    const cinTarget=new THREE.Vector3(cutShip.position.x-18,9,cutShip.position.z+16);
-    const cinLook=new THREE.Vector3(cutShip.position.x,2,cutShip.position.z);
-    camPos.lerp(cinTarget,expLerp(3,dt));
-    camLook.lerp(cinLook,expLerp(3,dt));
+    // Camera: wide shot → zoom in on Jensoon during map moment → pull back for crew fall
+    let cinTarget, cinLook, cinSpeed;
+    if(ct < 3.1){
+      // Wide establishing shot — camera off to side watching ship sail
+      cinTarget=new THREE.Vector3(cutShip.position.x-18,9,cutShip.position.z+16);
+      cinLook=new THREE.Vector3(cutShip.position.x,2,cutShip.position.z);
+      cinSpeed=3;
+    } else if(ct < 4.8){
+      // Close-up on Jensoon's deck position for map swallow
+      cinTarget=new THREE.Vector3(cutShip.position.x-3.5,4.2,cutShip.position.z+6.5);
+      cinLook=new THREE.Vector3(cutShip.position.x+1.8,2.9,cutShip.position.z-0.2);
+      cinSpeed=4;
+    } else {
+      // Pull back to see full ship and crew falling
+      cinTarget=new THREE.Vector3(cutShip.position.x-14,10,cutShip.position.z+14);
+      cinLook=new THREE.Vector3(cutShip.position.x,2,cutShip.position.z);
+      cinSpeed=3;
+    }
+    camPos.lerp(cinTarget,expLerp(cinSpeed,dt));
+    camLook.lerp(cinLook,expLerp(cinSpeed,dt));
 
     // Red smoke starts at t=3
     if(ct>3){ smkOn=true; }
