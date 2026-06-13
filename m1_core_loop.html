@@ -1605,7 +1605,7 @@ function loop(){
       cinTarget=new THREE.Vector3(cutShip.position.x-18,9,cutShip.position.z+16);
       cinLook=new THREE.Vector3(cutShip.position.x,2,cutShip.position.z);
       cinSpeed=3;
-    } else if(ct < 4.8){
+    } else if(ct < 7.0){
       // Close-up on Jensoon's deck position for map swallow
       cinTarget=new THREE.Vector3(cutShip.position.x-3.5,4.2,cutShip.position.z+6.5);
       cinLook=new THREE.Vector3(cutShip.position.x+1.8,2.9,cutShip.position.z-0.2);
@@ -1637,31 +1637,31 @@ function loop(){
       if(p.life>p.ml){ p.life=-1; p.m.visible=false; }
     });
 
-    // Jensoon raises map to mouth (t=3.2 – 4.2) then swallows it
+    // Jensoon raises map to mouth slowly (t=3.2 – 5.7) then swallows it
     const jf=cutCrewFigs[0];
-    if(ct>3.2 && ct<4.2){
-      const p=Math.min((ct-3.2)/0.6,1);
-      jf.armGroup.rotation.x=-p*2.2; // raise arm up toward head
+    if(ct>3.2 && ct<5.7){
+      const p=Math.min((ct-3.2)/2.0,1);
+      jf.armGroup.rotation.x=-p*2.2; // raise arm slowly toward head
       if(p>0.3 && !mapSwallowed){
-        showSub('JENSOON SWALLOWS THE MAP TO PROTECT IT!', 2.0);
+        showSub('JENSOON SWALLOWS THE MAP TO PROTECT IT!', 2.5);
       }
     }
-    if(ct>3.9 && !mapSwallowed){
+    if(ct>5.5 && !mapSwallowed){
       mapSwallowed=true;
       if(jf.mapParts) jf.mapParts.forEach(m=>m.visible=false); // map gone (swallowed)
     }
 
-    // Crew passes out at t=4.5
+    // Crew passes out at t=6.5
     cutCrewFigs.forEach((f,i)=>{
-      if(!f.fallen && ct>4.5+i*0.35){ f.fallen=true; }
+      if(!f.fallen && ct>6.5+i*0.35){ f.fallen=true; }
       if(f.fallen){
         f.g.rotation.z=Math.min(f.g.rotation.z+dt*2.8, Math.PI/2);
         f.g.position.y=Math.max(1.75-f.g.rotation.z*0.38, 1.2);
       }
     });
 
-    // Fade to black at t=7, show end card at t=8
-    if(ct>7 && cutsceneEl.style.display==='none'){
+    // Fade to black at t=9, show end card
+    if(ct>9 && cutsceneEl.style.display==='none'){
       cutsceneEl.style.display='flex';
       requestAnimationFrame(()=>cutsceneEl.classList.add('active'));
       setTimeout(()=>cutsceneEl.classList.add('dark'), 100);
