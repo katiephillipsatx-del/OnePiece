@@ -791,23 +791,23 @@ const cabinRoof=new THREE.Mesh(new THREE.BoxGeometry(2.6,0.2,2.7),toon(0x4a3520)
 cabinRoof.position.set(-2.5,3.2,0); cutShip.add(cabinRoof);
 
 // Mast
-const mastMat=toon(0x4a3010);
-const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.14,8.5,8),mastMat);
-mast.position.set(1.0,5.5,0); cutShip.add(mast);
-const boom=new THREE.Mesh(new THREE.CylinderGeometry(0.065,0.065,5.5,8),mastMat);
-boom.position.set(1.0,7.2,0); boom.rotation.z=Math.PI/2; cutShip.add(boom);
+const cutMastMat=toon(0x4a3010);
+const cutMast=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.14,8.5,8),cutMastMat);
+cutMast.position.set(1.0,5.5,0); cutShip.add(cutMast);
+const cutBoom=new THREE.Mesh(new THREE.CylinderGeometry(0.065,0.065,5.5,8),cutMastMat);
+cutBoom.position.set(1.0,7.2,0); cutBoom.rotation.z=Math.PI/2; cutShip.add(cutBoom);
 
 // Red & white striped sail (alternating strips)
-const sailGroup=new THREE.Group(); sailGroup.position.set(1.0,5.5,0.05); cutShip.add(sailGroup);
+const cutSailGroup=new THREE.Group(); cutSailGroup.position.set(1.0,5.5,0.05); cutShip.add(cutSailGroup);
 for(let s=0;s<8;s++){
   const col=s%2===0?0xdd1818:0xf5f0e8;
   const strip=new THREE.Mesh(new THREE.PlaneGeometry(0.66,4.5),new THREE.MeshToonMaterial({color:col,side:THREE.DoubleSide,gradientMap:GRAD}));
-  strip.position.set(-2.31+s*0.66,1.7,0); sailGroup.add(strip);
+  strip.position.set(-2.31+s*0.66,1.7,0); cutSailGroup.add(strip);
 }
 
 // Life preserver ring on side
-const ring=new THREE.Mesh(new THREE.TorusGeometry(0.32,0.09,8,16),toon(0xe63050));
-ring.position.set(-0.5,1.9,1.52); ring.rotation.y=Math.PI/2; cutShip.add(ring);
+const cutRing=new THREE.Mesh(new THREE.TorusGeometry(0.32,0.09,8,16),toon(0xe63050));
+cutRing.position.set(-0.5,1.9,1.52); cutRing.rotation.y=Math.PI/2; cutShip.add(cutRing);
 
 // Small crew silhouettes on deck (will fall when smoke hits)
 const cutCrewFigs=[];
