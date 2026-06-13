@@ -711,25 +711,8 @@ hairDome.position.y=0.18; orozRig.head.add(hairDome);
   tuft.position.set(ox,0.44+Math.abs(i-1)*0.04,0); tuft.rotation.z=(i-1)*0.25;
   orozRig.head.add(tuft);
 });
-// Oroz face — in a group so z can be flipped when controlled
+// Oroz face — group kept for flip logic, no features
 const orozFaceGroup=new THREE.Group(); orozRig.head.add(orozFaceGroup);
-const fWhite=new THREE.MeshToonMaterial({color:0xfafafa,gradientMap:GRAD});
-const fDark =new THREE.MeshToonMaterial({color:0x141414,gradientMap:GRAD});
-const fScar =new THREE.MeshToonMaterial({color:0xc08888,gradientMap:GRAD});
-[[-0.09,0.06,0.235],[0.09,0.06,0.235]].forEach(([x,y,z],i)=>{
-  const ew=new THREE.Mesh(new THREE.SphereGeometry(0.046,8,6),fWhite);
-  ew.position.set(x,y,z); ew.scale.z=0.32; orozFaceGroup.add(ew);
-  const ep=new THREE.Mesh(new THREE.SphereGeometry(0.027,6,5),fDark);
-  ep.position.set(x,y,z+0.01); ep.scale.z=0.28; orozFaceGroup.add(ep);
-  const eb=new THREE.Mesh(new THREE.BoxGeometry(0.082,0.017,0.008),fDark);
-  eb.position.set(x,y+0.072,z-0.008); eb.rotation.z=(i===0?0.30:-0.30); orozFaceGroup.add(eb);
-});
-const scar=new THREE.Mesh(new THREE.BoxGeometry(0.008,0.115,0.008),fScar);
-scar.position.set(-0.09,0.062,0.238); scar.rotation.z=0.10; orozFaceGroup.add(scar);
-const mth=new THREE.Mesh(new THREE.BoxGeometry(0.095,0.013,0.008),fDark);
-mth.position.set(0,-0.068,0.237); orozFaceGroup.add(mth);
-const nose=new THREE.Mesh(new THREE.SphereGeometry(0.022,6,5),toon(0xc8a07a));
-nose.position.set(0,-0.006,0.262); orozFaceGroup.add(nose);
 
 const bobRig=buildChar({skin:0xe8c8a0,shirt:0x4a8040,pants:0x2a4020,hatCol:0x4a8040,band:0xffd23f});
 bobRig.root.position.set(-10,0,5); scene.add(bobRig.root);
