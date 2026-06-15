@@ -927,7 +927,7 @@ const ringFloor=new THREE.Mesh(new THREE.CylinderGeometry(11.5,11.5,0.25,36),pbr
 ringFloor.position.y=-0.13; circusGroup.add(ringFloor);
 // Ring border — alternating red/white segments
 for(let ri=0;ri<24;ri++){
-  const rSeg=new THREE.Mesh(new THREE.CylinderGeometry(11.6,11.6,0.35,1,1,false,(ri/24)*Math.PI*2,(1/24)*Math.PI*2),
+  const rSeg=new THREE.Mesh(new THREE.CylinderGeometry(11.6,11.6,0.35,3,1,false,(ri/24)*Math.PI*2,(1/24)*Math.PI*2),
     toon(ri%2===0?0xdd1010:0xf8f8f8));
   rSeg.position.y=0.05; circusGroup.add(rSeg);
 }
@@ -961,7 +961,7 @@ for(let ci=0;ci<crowdN;ci++){
   circusGroup.add(cFig);
   chainPts.push(cFig.position.clone().add(new THREE.Vector3(0,0.3,0)));
 }
-chainPts.push(chainPts[0].clone());
+// closed=true handles wrap-around; do NOT add a duplicate endpoint
 const chainCurve=new THREE.CatmullRomCurve3(chainPts,true);
 const chainMesh=new THREE.Mesh(
   new THREE.TubeGeometry(chainCurve,crowdN*4,0.055,6,true),
