@@ -1253,6 +1253,7 @@ function startM2(){
   m2Active=true; m2Phase='boxcam'; m2CamT=0; m2DlgStarted=false;
   m2BoxT=0; m2BoxOpen=false; m2BoxFlyT=0; m2DlgDone=false; m2HenchDead=0;
   player.pos.set(M2_CX,0,M2_CZ); player.facing=0;
+  player.hp=player.maxHp; document.getElementById('pfill').style.width='100%';
   [playerRig,orozRig,noraRig].forEach((r,ri)=>{
     r.root.position.set(M2_CX+(ri-1)*1.2,0,M2_CZ+(ri===1?0:0.8));
   });
