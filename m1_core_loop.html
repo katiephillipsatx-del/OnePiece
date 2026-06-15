@@ -1280,12 +1280,12 @@ window.addEventListener('keyup',e=>keys.delete(e.code));
 let camYaw=Math.PI, dragging=false, dragX=0, rDownX=0, rDownY=0, rMoved=false;
 window.addEventListener('mousedown',e=>{
   resume();
-  if(e.button===0) doKick();
+  if(e.button===0) doPunch();
   if(e.button===2){ rDownX=e.clientX; rDownY=e.clientY; rMoved=false; dragging=true; dragX=e.clientX; }
 });
 window.addEventListener('mouseup',e=>{
   if(e.button===2){
-    if(!rMoved) doPunch();
+    if(!rMoved) doKick();
     dragging=false;
   }
 });
