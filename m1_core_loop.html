@@ -1003,20 +1003,21 @@ const crateLineMat=pbr(0x5a3008,0.9);
 const crateWoodMat2=pbr(0x7a4a10,0.88);
 const boxPanels=[];
 [
-  // [localPos, flyDir]
-  [[crateHalf,crateHalf,0],        [1.8,0.4,0]],
-  [[-crateHalf,crateHalf,0],       [-1.8,0.4,0]],
-  [[0,crateHalf,crateHalf],        [0,0.4,1.8]],
-  [[0,crateHalf,-crateHalf],       [0,0.4,-1.8]],
-  [[0,crateHalf*2,0],              [0,3.0,0.6]],
-].forEach(([lp,fd],pi)=>{
-  const isTop=pi===4;
-  const pw=isTop?crateHalf*2:0.12, ph=isTop?0.12:crateHalf*2, pd=isTop?crateHalf*2:crateHalf*2;
+  // [localPos, flyDir, width, height, depth]
+  [[crateHalf,crateHalf,0],   [1.8,0.4,0],   0.12,crateHalf*2,crateHalf*2], // right wall — thin X
+  [[-crateHalf,crateHalf,0],  [-1.8,0.4,0],  0.12,crateHalf*2,crateHalf*2], // left wall  — thin X
+  [[0,crateHalf,crateHalf],   [0,0.4,1.8],   crateHalf*2,crateHalf*2,0.12], // front wall — thin Z
+  [[0,crateHalf,-crateHalf],  [0,0.4,-1.8],  crateHalf*2,crateHalf*2,0.12], // back wall  — thin Z
+  [[0,crateHalf*2,0],         [0,3.0,0.6],   crateHalf*2,0.12,crateHalf*2], // top        — thin Y
+].forEach(([lp,fd,pw,ph,pd])=>{
   const pm=new THREE.Mesh(new THREE.BoxGeometry(pw,ph,pd),crateMat);
   pm.position.set(...lp); pm.castShadow=true;
   circusGroup.add(pm);
-  boxPanels.push({mesh:pm, startPos:new THREE.Vector3(...lp), flyDir:new THREE.Vector3(...fd), flyRot:new THREE.Vector3((Math.random()-0.5)*4,(Math.random()-0.5)*3,(Math.random()-0.5)*4)});
+  boxPanels.push({mesh:pm, startPos:new THREE.Vector3(...lp), flyDir:new THREE.Vector3(...fd),
+    flyRot:new THREE.Vector3((Math.random()-0.5)*4,(Math.random()-0.5)*3,(Math.random()-0.5)*4)});
 });
+const boxLight=new THREE.PointLight(0xffcc88,0,7);
+boxLight.position.set(0,3,0); circusGroup.add(boxLight);
 
 // ── HENCHMEN ──────────────────────────────────────────────────
 function buildHench(hSkin,hShirt,hPants,hHairCol,hScale){
@@ -1028,23 +1029,34 @@ function buildHench(hSkin,hShirt,hPants,hHairCol,hScale){
   ch.root.visible=false; scene.add(ch.root);
   return ch;
 }
-const h1Rig=buildHench(0xc88050,0x7020c0,0x3a0080,0x00ddaa);     // purple/teal hair
-const h2Rig=buildHench(0xe8b870,0xff6600,0x1a1a1a,0xffee00);     // orange/black, yellow hair
-const h3Rig=buildHench(0xa07050,0x209040,0x103820,0xff88cc);     // green, pink hair
-const h4Rig=buildHench(0xc8a880,0xe63946,0xf8f8f8,0xffffff);    // red/white, white hair
+const h1Rig=buildHench(0xc88050,0x7020c0,0x3a0080,0x00ddaa);
+const h2Rig=buildHench(0xe8b870,0xff6600,0x1a1a1a,0xffee00);
+const h3Rig=buildHench(0xa07050,0x209040,0x103820,0xff88cc);
+const h4Rig=buildHench(0xc8a880,0xe63946,0xf8f8f8,0xffffff);
+const h5Rig=buildHench(0xd09060,0x1144aa,0x0a2060,0x88ddff);
+const h6Rig=buildHench(0xb87840,0xcc4444,0x2a0808,0xff6644);
+const h7Rig=buildHench(0xe0a878,0x338833,0x1a4418,0x88ff44);
+const h8Rig=buildHench(0xc09060,0x884488,0x220022,0xee88ff);
+const h9Rig=buildHench(0xd8b080,0xddaa00,0x3a2000,0xffeeaa);
+const h10Rig=buildHench(0xa06848,0x227788,0x081820,0x00ffcc);
 
-const m2Henches=[h1Rig,h2Rig,h3Rig,h4Rig].map((rig,hi)=>({
-  rig,
-  pos:new THREE.Vector3(M2_CX+[5,-5,5,-5][hi],0,M2_CZ+[5,5,-5,-5][hi]),
-  hp:65, maxHp:65, speed:3.2, attackCd:0, facing:0,
+const _henchDefs=[
+  [h1Rig,1],[h2Rig,1],[h3Rig,1],
+  [h4Rig,2],[h5Rig,2],[h6Rig,2],
+  [h7Rig,3],[h8Rig,3],[h9Rig,3],[h10Rig,3],
+];
+const m2Henches=_henchDefs.map(([rig,wave],hi)=>({
+  rig, wave, spawned:false,
+  pos:new THREE.Vector3(M2_CX,0,M2_CZ),
+  hp:80, maxHp:80, speed:3.5, attackCd:0, facing:0,
   dead:false, kbVel:new THREE.Vector3(), flash:0, stagger:0, fallT:-1,
   hpBar:makeHpBar(rig.root,3.0,1.2),
 }));
 
 // ── BUNNY BOSS ────────────────────────────────────────────────
 const bunnyRig=(()=>{
-  const ch=buildChar({skin:0xf5d8b8,shirt:0xf8f8f8,pants:0xf8f8f8,hatCol:0xf8f8f8,band:0xf8f8f8,noHat:true});
-  ch.root.scale.setScalar(1.42);
+  const ch=buildChar({skin:0xf5f0f0,shirt:0xf8f8f8,pants:0x1a9090,hatCol:0xf8f8f8,band:0xf8f8f8,noHat:true});
+  ch.root.scale.setScalar(1.52);
   // Blue curly hair
   const bHMat=new THREE.MeshToonMaterial({color:0x2255dd,gradientMap:GRAD});
   const bHDome=new THREE.Mesh(new THREE.SphereGeometry(0.30,12,8,0,Math.PI*2,0,Math.PI*0.56),bHMat);
@@ -1053,40 +1065,79 @@ const bunnyRig=(()=>{
     const curl=new THREE.Mesh(new THREE.SphereGeometry(0.09,6,5),bHMat);
     curl.position.set(x,y,z); ch.head.add(curl);
   });
-  // Red top hat
-  const hatM=toon(0xdd0010);
-  const hatBrim2=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.44,0.07,14),hatM);
-  hatBrim2.position.y=0.46; ch.head.add(hatBrim2);
-  const hatCrown2=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.27,0.62,12),hatM);
-  hatCrown2.position.y=0.80; ch.head.add(hatCrown2);
-  const hatTop2=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,0.04,12),hatM);
-  hatTop2.position.y=1.12; ch.head.add(hatTop2);
-  const hatBand2=new THREE.Mesh(new THREE.CylinderGeometry(0.235,0.24,0.09,12),toon(0xffffff));
-  hatBand2.position.y=0.54; ch.head.add(hatBand2);
-  // Big red nose
+  ch.allMats.push(bHMat);
+  // Gold tri-corner pirate hat (3-sided brim = tri-corner shape)
+  const hatM=toon(0xe8c030);
+  const brim3=new THREE.Mesh(new THREE.CylinderGeometry(0.52,0.54,0.07,3),hatM);
+  brim3.position.y=0.44; ch.head.add(brim3);
+  const dome3=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.38,0.40,12),hatM);
+  dome3.position.y=0.68; ch.head.add(dome3);
+  const hatTop3=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.24,0.04,12),hatM);
+  hatTop3.position.y=0.90; ch.head.add(hatTop3);
+  const hatBand3=new THREE.Mesh(new THREE.CylinderGeometry(0.39,0.39,0.07,12),toon(0x1a1a1a));
+  hatBand3.position.y=0.48; ch.head.add(hatBand3);
+  const skullM=toon(0xf8f8f8);
+  const skull=new THREE.Mesh(new THREE.SphereGeometry(0.065,8,6),skullM);
+  skull.position.set(0,0.65,-0.32); ch.head.add(skull);
+  ch.allMats.push(hatM);
+  // Red nose
   const noseMesh=new THREE.Mesh(new THREE.SphereGeometry(0.12,8,6),toon(0xff1010));
   noseMesh.position.set(0,0,-0.30); ch.head.add(noseMesh);
-  // Polka dots on torso
-  [[0xff2020,0.18,0.18,-0.30],[0xffdd00,-0.17,0.09,-0.30],[0x00cc55,0.08,-0.12,-0.31],[0x2266ff,-0.17,-0.05,-0.29]].forEach(([col,x,y,z])=>{
-    const dot=new THREE.Mesh(new THREE.SphereGeometry(0.072,6,4),toon(col));
-    dot.position.set(x,y,z); ch.torso.add(dot);
+  // Red/white horizontal stripes on shirt
+  const stripeM=toon(0xdd1010);
+  [-0.15,0.05,0.22].forEach(y=>{
+    const stripe=new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.32,0.07,12,1,true),stripeM);
+    stripe.position.set(0,y,0); ch.torso.add(stripe);
   });
-  // Frilly collar
-  const frillM=new THREE.Mesh(new THREE.TorusGeometry(0.26,0.075,5,14),toon(0xf8f8f8));
-  frillM.position.set(0,0.40,-0.10); ch.torso.add(frillM);
-  // Big red shoes
-  const shoeM2=toon(0xdd0010);
+  ch.allMats.push(stripeM);
+  // Purple scarf at neck
+  const scarfM=toon(0x8833bb);
+  const scarf=new THREE.Mesh(new THREE.TorusGeometry(0.26,0.08,6,14),scarfM);
+  scarf.position.set(0,0.38,0); ch.torso.add(scarf);
+  ch.allMats.push(scarfM);
+  // Green sash belt
+  const sashM=toon(0x228844);
+  const sash=new THREE.Mesh(new THREE.CylinderGeometry(0.33,0.31,0.12,12),sashM);
+  sash.position.set(0,-0.08,0); ch.torso.add(sash);
+  ch.allMats.push(sashM);
+  // Gold epaulettes with fringe
+  const epMat=toon(0xe8c030);
+  [-0.44,0.44].forEach(x=>{
+    const ep=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.14,0.10,8),epMat);
+    ep.position.set(x,0.28,0); ch.torso.add(ep);
+    const fringe=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.14,0.14,8),epMat);
+    fringe.position.set(x,0.16,0); ch.torso.add(fringe);
+  });
+  ch.allMats.push(epMat);
+  // White fur coat (full open cylinder — voluminous)
+  const coatM=toon(0xf8f8f8);
+  const coat=new THREE.Mesh(new THREE.CylinderGeometry(0.82,0.68,1.08,16,1,true),coatM);
+  coat.position.set(0,-0.12,0); ch.torso.add(coat);
+  const collar=new THREE.Mesh(new THREE.CylinderGeometry(0.60,0.82,0.20,16,1,true),coatM);
+  collar.position.set(0,0.44,0); ch.torso.add(collar);
+  ch.allMats.push(coatM);
+  // White gloves on hands
+  const gloveM=toon(0xf8f8f8);
+  [ch.armR,ch.armL].forEach(arm=>{
+    const glove=new THREE.Mesh(new THREE.SphereGeometry(0.13,8,6),gloveM);
+    glove.position.y=-0.28; arm.fp.add(glove);
+  });
+  // Steel claw weapons on both hands (3 blades per hand)
+  const clawM=toon(0xd0d8e0);
+  [ch.armR,ch.armL].forEach(arm=>{
+    [-0.12,0,0.12].forEach(xa=>{
+      const claw=new THREE.Mesh(new THREE.ConeGeometry(0.03,0.32,4),clawM);
+      claw.position.set(xa,-0.54,-0.13); claw.rotation.x=0.38; arm.fp.add(claw);
+    });
+  });
+  ch.allMats.push(clawM);
+  // Big teal shoes
+  const shoeM2=toon(0x1a9090);
   [ch.legR,ch.legL].forEach((leg,si)=>{
-    const shoe2=new THREE.Mesh(new THREE.CapsuleGeometry(0.12,0.46,4,6),shoeM2);
-    shoe2.position.set((si===0?-1:1)*0.04,-0.30,-0.14); shoe2.rotation.x=0.24; leg.shin.add(shoe2);
+    const shoe=new THREE.Mesh(new THREE.CapsuleGeometry(0.13,0.50,4,6),shoeM2);
+    shoe.position.set((si===0?-1:1)*0.04,-0.30,-0.16); shoe.rotation.x=0.24; leg.shin.add(shoe);
   });
-  // Oversized mallet
-  const mG=new THREE.Group(); mG.position.set(0.44,0.22,0); ch.torso.add(mG);
-  const mShaft=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,1.0,8),pbr(0x5a3010,0.8));
-  mShaft.position.y=-0.52; mG.add(mShaft);
-  const mHead2=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.22,0.46,10),toon(0xdd0010));
-  mHead2.position.y=-1.12; mHead2.rotation.z=Math.PI/2; mG.add(mHead2);
-  ch.malletGroup=mG;
+  ch.allMats.push(shoeM2);
   ch.root.visible=false; scene.add(ch.root);
   return ch;
 })();
@@ -1095,8 +1146,10 @@ const bunny2={
   pos:new THREE.Vector3(M2_CX,0,M2_CZ-7),
   hp:260, maxHp:260, speed:2.5, attackCd:0, facing:0,
   dead:false, kbVel:new THREE.Vector3(), flash:0, stagger:0, fallT:-1,
-  active:false, swingT:-1,
+  active:false, swingT:-1, phase:1,
 };
+let bunnyExplodeT=-1, bunnyReassembling=false;
+const bunnyDebris=[];
 
 // M2 state
 let m2Active=false, m2Phase='boxcam'; // 'boxcam'|'henchmen'|'boss'|'win'
@@ -1104,8 +1157,19 @@ let m2BoxT=0, m2BoxOpen=false, m2BoxFlyT=0, m2DlgDone=false, m2HenchDead=0;
 let m2CamT=0, m2DlgStarted=false;
 const m2HenchEl=document.getElementById('m2-hench');
 
+function spawnHenchWave(wave){
+  const waveHenches=m2Henches.filter(h=>h.wave===wave&&!h.spawned);
+  const total=waveHenches.length;
+  waveHenches.forEach((h,i)=>{
+    h.spawned=true;
+    const a=((i/total)*Math.PI*2)+(wave-1)*0.8;
+    h.pos.set(M2_CX+Math.cos(a)*8,0,M2_CZ+Math.sin(a)*8);
+    h.rig.root.position.set(h.pos.x,0,h.pos.z);
+    h.rig.root.visible=true;
+  });
+}
 function hitHench(h,range,dmg,dir,kbSpd,upward){
-  if(h.dead||player.pos.distanceTo(h.pos)>range) return;
+  if(h.dead||!h.spawned||player.pos.distanceTo(h.pos)>range) return;
   h.hp=Math.max(0,h.hp-dmg);
   h.kbVel.copy(dir).multiplyScalar(kbSpd);
   if(upward) h.kbVel.y=3.8;
@@ -1115,18 +1179,49 @@ function hitHench(h,range,dmg,dir,kbSpd,upward){
   if(h.hp<=0&&!h.dead){
     h.dead=true; h.fallT=0; sfx.ko(); flashKO();
     m2HenchDead++;
-    m2HenchEl.textContent='HENCHMEN: '+(4-m2HenchDead)+'/4 REMAINING';
-    if(m2HenchDead>=4){
-      m2Phase='boss';
-      bunny2.active=true;
-      bunnyRig.root.visible=true;
+    const deadW1=m2Henches.filter(h=>h.wave===1&&h.dead).length;
+    const deadW12=m2Henches.filter(h=>(h.wave===1||h.wave===2)&&h.dead).length;
+    if(deadW1>=2&&!m2Henches.some(h=>h.wave===2&&h.spawned)) spawnHenchWave(2);
+    if(deadW12>=4&&!m2Henches.some(h=>h.wave===3&&h.spawned)) spawnHenchWave(3);
+    const remaining=10-m2HenchDead;
+    m2HenchEl.textContent=remaining>0?'HENCHMEN: '+remaining+'/10 REMAINING':'';
+    if(m2HenchDead>=10){
+      m2Phase='boss'; bunny2.active=true; bunnyRig.root.visible=true;
       bunny2.pos.set(M2_CX,0,M2_CZ-7);
       m2HenchEl.textContent='DEFEAT BUNNY!';
     }
   }
 }
+function explodeBunny(){
+  bunnyExplodeT=0; bunnyReassembling=false;
+  const cols=[0xf8f8f8,0xdd1010,0x2255dd,0xe8c030,0x1a9090,0xf5f0f0];
+  for(let i=0;i<22;i++){
+    const dm=new THREE.Mesh(
+      new THREE.BoxGeometry(0.18+Math.random()*0.28,0.13+Math.random()*0.22,0.10+Math.random()*0.18),
+      toon(cols[Math.floor(Math.random()*cols.length)])
+    );
+    dm.position.copy(bunny2.pos).add(new THREE.Vector3(0,1.5+Math.random()*1.5,0));
+    scene.add(dm);
+    const spd=5+Math.random()*9, ang=Math.random()*Math.PI*2;
+    bunnyDebris.push({mesh:dm,vel:new THREE.Vector3(Math.cos(ang)*spd,3+Math.random()*6,Math.sin(ang)*spd),life:1});
+  }
+  bunnyRig.root.visible=false;
+  setTimeout(()=>{ bunnyReassembling=true; },2500);
+  setTimeout(()=>{ startBunnyPhase2(); },5000);
+}
+function startBunnyPhase2(){
+  bunny2.phase=2; bunny2.hp=180; bunny2.maxHp=180;
+  bunny2.dead=false; bunny2.fallT=-1; bunny2.active=true; bunny2.swingT=-1;
+  bunny2.pos.set(M2_CX,0,M2_CZ-7);
+  bunnyRig.root.visible=true; bunnyRig.root.rotation.set(0,0,0); bunnyRig.root.position.y=0;
+  bunnyRig.allMats.forEach(m=>{ if(m.emissive) m.emissive.setScalar(0); });
+  setHpBar(bunnyHpBar,1); m2Phase='boss';
+  m2HenchEl.textContent='BUNNY — PHASE 2!';
+  bunnyExplodeT=-1; bunnyReassembling=false;
+  bunnyDebris.forEach(d=>scene.remove(d.mesh)); bunnyDebris.length=0;
+}
 function hitBunny(dmg,dir,kbSpd,upward){
-  if(!bunny2.active||bunny2.dead) return;
+  if(!bunny2.active||bunny2.dead||bunnyExplodeT>=0) return;
   bunny2.hp=Math.max(0,bunny2.hp-dmg);
   bunny2.kbVel.copy(dir).multiplyScalar(kbSpd);
   if(upward) bunny2.kbVel.y=2.5;
@@ -1135,37 +1230,46 @@ function hitBunny(dmg,dir,kbSpd,upward){
   spawnSparks(bunny2.pos.clone().add(new THREE.Vector3(0,2.2,0)));
   if(bunny2.hp<=0&&!bunny2.dead){
     bunny2.dead=true; bunny2.fallT=0; sfx.ko();
-    m2Phase='win'; m2HenchEl.textContent='';
-    setTimeout(()=>{ winCircus(); },900);
+    if(bunny2.phase===1){
+      explodeBunny();
+      m2HenchEl.textContent='???';
+    } else {
+      m2Phase='win'; m2HenchEl.textContent='';
+      explodeBunny();
+      setTimeout(()=>{ winCircus(); },900);
+    }
   }
 }
 function winCircus(){
   const w=document.getElementById('win');
-  w.querySelector('h1').textContent='ESCAPED!';
+  w.querySelector('h1').textContent='YOU DEFEATED BUNNY...';
   const ps=w.querySelectorAll('p');
-  if(ps[0]) ps[0].textContent='THE CREW BREAKS FREE FROM THE CIRCUS.';
-  if(ps[1]) ps[1].textContent='THE ADVENTURE CONTINUES...';
+  if(ps[0]) ps[0].textContent='FOR NOW...';
+  if(ps[1]) ps[1].textContent='THE CREW BREAKS FREE FROM THE CIRCUS.';
   if(ps[2]) ps[2].style.display='none';
   w.classList.add('active');
 }
 function startM2(){
   m2Active=true; m2Phase='boxcam'; m2CamT=0; m2DlgStarted=false;
   m2BoxT=0; m2BoxOpen=false; m2BoxFlyT=0; m2DlgDone=false; m2HenchDead=0;
-  // Teleport player + crew to circus center
   player.pos.set(M2_CX,0,M2_CZ); player.facing=0;
   [playerRig,orozRig,noraRig].forEach((r,ri)=>{
     r.root.position.set(M2_CX+(ri-1)*1.2,0,M2_CZ+(ri===1?0:0.8));
   });
-  // Show circus
   circusGroup.visible=true;
-  // Reset box panels
   boxPanels.forEach(p=>{p.mesh.position.copy(p.startPos); p.mesh.rotation.set(0,0,0); p.mesh.visible=true;});
-  // Reset henchmen
-  m2Henches.forEach(h=>{ h.hp=h.maxHp; h.dead=false; h.fallT=-1; h.rig.root.visible=false; setHpBar(h.hpBar,1); });
-  // Reset bunny
-  bunny2.hp=bunny2.maxHp; bunny2.dead=false; bunny2.fallT=-1; bunny2.active=false;
-  bunnyRig.root.visible=false; setHpBar(bunnyHpBar,1);
-  // Snap camera outside the box for cinematic zoom-in
+  boxLight.intensity=0;
+  m2Henches.forEach(h=>{
+    h.hp=h.maxHp; h.dead=false; h.fallT=-1; h.spawned=false;
+    h.rig.root.visible=false; h.rig.root.rotation.set(0,0,0); h.rig.root.position.y=0;
+    setHpBar(h.hpBar,1);
+  });
+  bunny2.hp=260; bunny2.maxHp=260; bunny2.dead=false; bunny2.fallT=-1;
+  bunny2.active=false; bunny2.phase=1;
+  bunnyRig.root.visible=false; bunnyRig.root.rotation.set(0,0,0);
+  setHpBar(bunnyHpBar,1);
+  bunnyExplodeT=-1; bunnyReassembling=false;
+  bunnyDebris.forEach(d=>scene.remove(d.mesh)); bunnyDebris.length=0;
   camPos.set(M2_CX-12,7,M2_CZ+16);
   camLook.set(M2_CX,2,M2_CZ);
   m2HenchEl.style.display=''; m2HenchEl.textContent='';
@@ -1871,6 +1975,7 @@ function loop(){
         camLook.lerp(new THREE.Vector3(cx-0.6,1.4,cz-0.6),expLerp(6,dt));
         if(!m2DlgStarted){
           m2DlgStarted=true;
+          boxLight.intensity=1.4;
           startDialogue([
             {name:'NORA',  text:'Oh no! We lost the map!'},
             {name:'JENSOON',text:"Don't worry... it's in a safe place."},
@@ -1880,8 +1985,9 @@ function loop(){
       // After dialogue finishes, explode the box
       if(m2DlgDone&&!m2BoxOpen){
         m2BoxOpen=true; m2Phase='henchmen';
-        m2Henches.forEach((h,hi)=>{ h.pos.set(M2_CX+[5,-5,5,-5][hi],0,M2_CZ+[5,5,-5,-5][hi]); h.rig.root.visible=true; });
-        m2HenchEl.textContent='DEFEAT THE HENCHMEN!';
+        boxLight.intensity=0;
+        spawnHenchWave(1);
+        m2HenchEl.textContent='HENCHMEN: 10/10 REMAINING';
       }
     }
     // Box fly-out animation
@@ -1899,6 +2005,7 @@ function loop(){
     // Henchmen AI
     if(m2Phase==='henchmen'||m2Phase==='boss'){
       m2Henches.forEach(h=>{
+        if(!h.spawned) return;
         if(h.dead){
           if(h.fallT>=0){
             h.fallT=Math.min(h.fallT+dt,0.55);
@@ -1922,7 +2029,7 @@ function loop(){
           // Chase player
           const toP2=new THREE.Vector3(player.pos.x-h.pos.x,0,player.pos.z-h.pos.z);
           const dist2=toP2.length();
-          if(dist2>1.4){ toP2.normalize(); h.pos.x+=toP2.x*h.speed*dt; h.pos.z+=toP2.z*h.speed*dt; h.facing=Math.atan2(toP2.x,toP2.z); }
+          if(dist2>1.4){ toP2.normalize(); h.pos.x+=toP2.x*h.speed*dt; h.pos.z+=toP2.z*h.speed*dt; h.facing=Math.atan2(-toP2.x,-toP2.z); }
           h.attackCd-=dt;
           if(dist2<1.8&&h.attackCd<=0){ damagePlayer(7); h.attackCd=2.2; }
         }
@@ -1944,30 +2051,45 @@ function loop(){
       else {
         const btoP=new THREE.Vector3(player.pos.x-bunny2.pos.x,0,player.pos.z-bunny2.pos.z);
         const bdist=btoP.length();
-        if(bdist>1.6){ btoP.normalize(); bunny2.pos.x+=btoP.x*bunny2.speed*dt; bunny2.pos.z+=btoP.z*bunny2.speed*dt; bunny2.facing=Math.atan2(btoP.x,btoP.z); }
+        if(bdist>1.6){ btoP.normalize(); bunny2.pos.x+=btoP.x*bunny2.speed*dt; bunny2.pos.z+=btoP.z*bunny2.speed*dt; bunny2.facing=Math.atan2(-btoP.x,-btoP.z); }
         bunny2.attackCd-=dt;
         if(bdist<2.2&&bunny2.attackCd<=0){ damagePlayer(12); bunny2.attackCd=2.5; bunny2.swingT=0; sfx.boss(); }
       }
-      // Mallet swing animation
+      // Claw swipe animation
       if(bunny2.swingT>=0){
         bunny2.swingT=Math.min(bunny2.swingT+dt,1.0);
         const bsw=bunny2.swingT;
-        if(bsw<0.25){ bunnyRig.malletGroup.rotation.x=-(bsw/0.25)*1.6; }
-        else if(bsw<0.55){ bunnyRig.malletGroup.rotation.x=-1.6+((bsw-0.25)/0.30)*3.4; }
-        else { bunnyRig.malletGroup.rotation.x=(1.8)*(1-(bsw-0.55)/0.45); }
-        if(bunny2.swingT>=1.0){ bunny2.swingT=-1; bunnyRig.malletGroup.rotation.set(0,0,0); }
+        if(bsw<0.25){ bunnyRig.armR.sp.rotation.x=-(bsw/0.25)*1.5; bunnyRig.armL.sp.rotation.x=-(bsw/0.25)*1.5; }
+        else if(bsw<0.55){ const p=(bsw-0.25)/0.30; bunnyRig.armR.sp.rotation.x=-1.5+p*3.0; bunnyRig.armL.sp.rotation.x=-1.5+p*3.0; }
+        else { const p=(bsw-0.55)/0.45; bunnyRig.armR.sp.rotation.x=1.5*(1-p); bunnyRig.armL.sp.rotation.x=1.5*(1-p); }
+        if(bunny2.swingT>=1.0){ bunny2.swingT=-1; bunnyRig.armR.sp.rotation.x=0; bunnyRig.armL.sp.rotation.x=0; }
       }
       bunnyRig.root.position.set(bunny2.pos.x,bunny2.pos.y,bunny2.pos.z);
       bunnyRig.root.rotation.y=bunny2.facing;
       if(bunny2.flash>0){ bunny2.flash-=dt; bunnyRig.allMats.forEach(m=>m.emissive&&(m.emissive.setScalar(bunny2.flash>0?0.55:0))); }
       setHpBar(bunnyHpBar,bunny2.hp/bunny2.maxHp);
     }
-    if(bunny2.dead&&bunny2.fallT>=0){
+    if(bunny2.dead&&bunny2.fallT>=0&&bunny2.phase===2){
       bunny2.fallT=Math.min(bunny2.fallT+dt,0.7);
       const bfe=1-Math.pow(1-bunny2.fallT/0.7,2);
       bunnyRig.root.rotation.z=bfe*(Math.PI/2);
       bunnyRig.root.position.y=-bfe*0.5;
       bunnyRig.allMats.forEach(m=>m.color&&m.color.lerp(new THREE.Color(0.35,0.35,0.35),0.04));
+    }
+    if(bunnyExplodeT>=0){
+      bunnyExplodeT+=dt;
+      bunnyDebris.forEach(d=>{
+        if(bunnyReassembling){
+          const tgt=new THREE.Vector3(bunny2.pos.x,1.6,bunny2.pos.z);
+          d.mesh.position.lerp(tgt,0.06);
+        } else {
+          d.vel.y-=20*dt;
+          d.mesh.position.addScaledVector(d.vel,dt);
+          d.mesh.rotation.x+=d.vel.x*0.4*dt;
+          d.mesh.rotation.z+=d.vel.z*0.4*dt;
+          if(d.mesh.position.y<-2) d.vel.set(0,0,0);
+        }
+      });
     }
   } // end m2Active enemies
 
