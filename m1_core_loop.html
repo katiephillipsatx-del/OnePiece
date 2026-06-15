@@ -998,7 +998,7 @@ circusGroup.add(chainMesh);
 
 // Breakable starting crate
 const crateHalf=2.0; // box is 4×4 wide, 4 tall
-const crateMat=pbr(0x9a6020,0.85);
+const crateMat=new THREE.MeshStandardMaterial({color:0x9a6020,roughness:0.85,side:THREE.DoubleSide});
 const crateLineMat=pbr(0x5a3008,0.9);
 const crateWoodMat2=pbr(0x7a4a10,0.88);
 const boxPanels=[];
@@ -1099,8 +1099,9 @@ const bunny2={
 };
 
 // M2 state
-let m2Active=false, m2Phase='box'; // 'box'|'henchmen'|'boss'|'win'
+let m2Active=false, m2Phase='boxcam'; // 'boxcam'|'henchmen'|'boss'|'win'
 let m2BoxT=0, m2BoxOpen=false, m2BoxFlyT=0, m2DlgDone=false, m2HenchDead=0;
+let m2CamT=0, m2DlgStarted=false;
 const m2HenchEl=document.getElementById('m2-hench');
 
 function hitHench(h,range,dmg,dir,kbSpd,upward){
@@ -1148,8 +1149,8 @@ function winCircus(){
   w.classList.add('active');
 }
 function startM2(){
-  m2Active=true; m2Phase='box'; m2BoxT=0; m2BoxOpen=false; m2BoxFlyT=0;
-  m2DlgDone=false; m2HenchDead=0;
+  m2Active=true; m2Phase='boxcam'; m2CamT=0; m2DlgStarted=false;
+  m2BoxT=0; m2BoxOpen=false; m2BoxFlyT=0; m2DlgDone=false; m2HenchDead=0;
   // Teleport player + crew to circus center
   player.pos.set(M2_CX,0,M2_CZ); player.facing=0;
   [playerRig,orozRig,noraRig].forEach((r,ri)=>{
@@ -1164,18 +1165,10 @@ function startM2(){
   // Reset bunny
   bunny2.hp=bunny2.maxHp; bunny2.dead=false; bunny2.fallT=-1; bunny2.active=false;
   bunnyRig.root.visible=false; setHpBar(bunnyHpBar,1);
-  // Snap camera to circus
-  camPos.set(M2_CX,8,M2_CZ+20);
-  camLook.set(M2_CX,1.4,M2_CZ);
-  m2HenchEl.style.display='';
-  m2HenchEl.textContent='DEFEAT THE HENCHMEN!';
-  // Dialogue plays immediately
-  setTimeout(()=>{
-    startDialogue([
-      {name:'NORA', text:'Oh no! We lost the map!'},
-      {name:'JENSOON', text:"Don't worry... it's in a safe place."},
-    ],()=>{ m2DlgDone=true; });
-  },600);
+  // Snap camera outside the box for cinematic zoom-in
+  camPos.set(M2_CX-12,7,M2_CZ+16);
+  camLook.set(M2_CX,2,M2_CZ);
+  m2HenchEl.style.display=''; m2HenchEl.textContent='';
 }
 document.getElementById('cut-continue').addEventListener('click',()=>{
   cutsceneActive=false;
@@ -1561,7 +1554,7 @@ function loop(){
   if(keys.has('KeyS')||keys.has('ArrowDown'))  mv.addScaledVector(cf,-1);
   if(keys.has('KeyA')||keys.has('ArrowLeft'))  mv.addScaledVector(cr,-1);
   if(keys.has('KeyD')||keys.has('ArrowRight')) mv.addScaledVector(cr, 1);
-  const moving=mv.lengthSq()>0.001;
+  const moving=mv.lengthSq()>0.001&&!(m2Active&&m2Phase==='boxcam');
   if(moving){
     mv.normalize();
     player.pos.addScaledVector(mv,player.speed*dt);
@@ -1857,14 +1850,38 @@ function loop(){
 
   // ── M2 ENEMIES ──
   if(m2Active){
-    // Box break countdown
-    if(m2Phase==='box'&&m2DlgDone&&!m2BoxOpen){
-      m2BoxT+=dt;
-      if(m2BoxT>=3){
-        m2BoxOpen=true;
-        m2Phase='henchmen';
-        m2Henches.forEach(h=>{ h.rig.root.visible=true; h.pos.copy(new THREE.Vector3(M2_CX,0,M2_CZ).add(h.pos.clone().sub(new THREE.Vector3(M2_CX,0,M2_CZ)))); });
-        m2Henches.forEach((h,hi)=>{ h.pos.set(M2_CX+[5,-5,5,-5][hi],0,M2_CZ+[5,5,-5,-5][hi]); });
+    // ── BOX CAM SEQUENCE ──
+    if(m2Phase==='boxcam'){
+      m2CamT+=dt;
+      const cx=M2_CX, cz=M2_CZ;
+      if(m2CamT<2.5){
+        // Wide exterior — camera far back showing the full crate
+        camPos.lerp(new THREE.Vector3(cx-12,7,cz+16),expLerp(3,dt));
+        camLook.lerp(new THREE.Vector3(cx,2,cz),expLerp(3,dt));
+      } else if(m2CamT<4.8){
+        // Smooth zoom-in toward the box
+        const p=((m2CamT-2.5)/2.3); const sp=p*p*(3-2*p);
+        const ext=new THREE.Vector3(cx-12,7,cz+16);
+        const ins=new THREE.Vector3(cx+1.4,2.5,cz+1.4);
+        camPos.copy(ext.clone().lerp(ins,sp));
+        camLook.lerp(new THREE.Vector3(cx-0.6,1.4,cz-0.6),expLerp(4,dt));
+      } else {
+        // Inside close-up — characters filling the frame
+        camPos.lerp(new THREE.Vector3(cx+1.4,2.5,cz+1.4),expLerp(6,dt));
+        camLook.lerp(new THREE.Vector3(cx-0.6,1.4,cz-0.6),expLerp(6,dt));
+        if(!m2DlgStarted){
+          m2DlgStarted=true;
+          startDialogue([
+            {name:'NORA',  text:'Oh no! We lost the map!'},
+            {name:'JENSOON',text:"Don't worry... it's in a safe place."},
+          ],()=>{ m2DlgDone=true; });
+        }
+      }
+      // After dialogue finishes, explode the box
+      if(m2DlgDone&&!m2BoxOpen){
+        m2BoxOpen=true; m2Phase='henchmen';
+        m2Henches.forEach((h,hi)=>{ h.pos.set(M2_CX+[5,-5,5,-5][hi],0,M2_CZ+[5,5,-5,-5][hi]); h.rig.root.visible=true; });
+        m2HenchEl.textContent='DEFEAT THE HENCHMEN!';
       }
     }
     // Box fly-out animation
@@ -2063,8 +2080,10 @@ function loop(){
     composer.render(); return;
   }
 
-  camPos.lerp(camTarget,zoomSpeed);
-  camLook.lerp(player.pos.clone().add(new THREE.Vector3(0,1.4,0)),expLerp(12,dt));
+  if(!(m2Active&&m2Phase==='boxcam')){
+    camPos.lerp(camTarget,zoomSpeed);
+    camLook.lerp(player.pos.clone().add(new THREE.Vector3(0,1.4,0)),expLerp(12,dt));
+  }
   camera.position.copy(camPos); camera.lookAt(camLook);
 
   composer.render();
