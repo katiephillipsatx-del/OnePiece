@@ -67,6 +67,10 @@ canvas { display:block; }
 #cutscene-end p  { font-family:'Courier New',monospace; color:rgba(251,247,236,0.75); letter-spacing:3px; font-size:13px; opacity:0; transition:opacity 1.2s ease 1.4s; }
 #cutscene-end.dark h1, #cutscene-end.dark p { opacity:1; }
 #cut-sub { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); font-family:'Courier New',monospace; font-size:13px; letter-spacing:2px; color:#ffd23f; text-shadow:0 2px 8px rgba(0,0,0,0.9); opacity:0; transition:opacity 0.4s; pointer-events:none; z-index:250; white-space:nowrap; }
+#cut-continue { background:none; border:1.5px solid rgba(255,210,63,0); color:rgba(255,210,63,0); font-family:'Courier New',monospace; font-size:12px; letter-spacing:3px; padding:10px 28px; border-radius:4px; cursor:pointer; margin-top:28px; transition:color 1.2s ease 2.2s, border-color 1.2s ease 2.2s; }
+#cut-continue:hover { background:rgba(255,210,63,0.15); }
+#cutscene-end.dark #cut-continue { color:rgba(255,210,63,0.9); border-color:rgba(255,210,63,0.55); }
+#m2-hench { position:fixed; top:20px; left:50%; transform:translateX(-50%); font-family:'Courier New',monospace; font-size:11px; letter-spacing:3px; color:#ffd23f; text-shadow:0 0 10px rgba(255,210,63,0.6); display:none; }
 </style>
 </head>
 <body>
@@ -129,7 +133,9 @@ canvas { display:block; }
 <div id="cutscene-end">
   <h1>TO BE CONTINUED...</h1>
   <p>THE CREW HAS BEEN CAPTURED BY MYSTERIOUS RED SMOKE</p>
+  <button id="cut-continue">CONTINUE →</button>
 </div>
+<div id="m2-hench"></div>
 <div id="cut-sub"></div>
 
 <script type="importmap">
@@ -909,6 +915,266 @@ const bossRig=buildBoss();
 bossRig.root.position.set(0,0,-14); scene.add(bossRig.root);
 const bossHpBar=makeHpBar(bossRig.root,4.2,2.5);
 
+// ── M2: CIRCUS ────────────────────────────────────────────────
+const M2_CX=0, M2_CZ=-300;
+const circusGroup=new THREE.Group();
+circusGroup.position.set(M2_CX,0,M2_CZ);
+circusGroup.visible=false;
+scene.add(circusGroup);
+
+// Ring floor — sandy sawdust
+const ringFloor=new THREE.Mesh(new THREE.CylinderGeometry(11.5,11.5,0.25,36),pbr(0xc8a050,0.9));
+ringFloor.position.y=-0.13; circusGroup.add(ringFloor);
+// Ring border — alternating red/white segments
+for(let ri=0;ri<24;ri++){
+  const rSeg=new THREE.Mesh(new THREE.CylinderGeometry(11.6,11.6,0.35,1,1,false,(ri/24)*Math.PI*2,(1/24)*Math.PI*2),
+    toon(ri%2===0?0xdd1010:0xf8f8f8));
+  rSeg.position.y=0.05; circusGroup.add(rSeg);
+}
+
+// Bleacher platforms (6 sections)
+const blMat=pbr(0x8b5a2b,0.85);
+for(let bi=0;bi<6;bi++){
+  const bAng=(bi/6)*Math.PI*2;
+  const bSin=Math.sin(bAng), bCos=Math.cos(bAng);
+  const bl=new THREE.Mesh(new THREE.BoxGeometry(4.8,0.7,2.8),blMat);
+  bl.position.set(bSin*14.2,0.0,bCos*14.2); bl.rotation.y=bAng; circusGroup.add(bl);
+  const bl2=new THREE.Mesh(new THREE.BoxGeometry(4.8,0.7,2.2),blMat);
+  bl2.position.set(bSin*15.8,0.85,bCos*15.8); bl2.rotation.y=bAng; circusGroup.add(bl2);
+}
+
+// Crowd figures + one continuous chain
+const crowdN=18;
+const chainPts=[];
+for(let ci=0;ci<crowdN;ci++){
+  const cAng=(ci/crowdN)*Math.PI*2;
+  const cr=14.0+Math.random()*2;
+  const cFig=new THREE.Group();
+  const cBodyMat=new THREE.MeshToonMaterial({color:new THREE.Color().setHSL(ci/crowdN,0.55,0.32+Math.random()*0.15),gradientMap:GRAD});
+  const cBody=new THREE.Mesh(new THREE.CapsuleGeometry(0.14,0.28,4,6),cBodyMat);
+  cBody.position.y=0.28; cFig.add(cBody);
+  const cHead=new THREE.Mesh(new THREE.SphereGeometry(0.12,6,5),cBodyMat);
+  cHead.position.y=0.62; cFig.add(cHead);
+  const row=ci%3;
+  cFig.position.set(Math.sin(cAng)*cr, 0.85+row*0.7, Math.cos(cAng)*cr);
+  cFig.rotation.y=cAng+Math.PI;
+  circusGroup.add(cFig);
+  chainPts.push(cFig.position.clone().add(new THREE.Vector3(0,0.3,0)));
+}
+chainPts.push(chainPts[0].clone());
+const chainCurve=new THREE.CatmullRomCurve3(chainPts,true);
+const chainMesh=new THREE.Mesh(
+  new THREE.TubeGeometry(chainCurve,crowdN*4,0.055,6,true),
+  new THREE.MeshToonMaterial({color:0xb8b8b8,gradientMap:GRAD}));
+circusGroup.add(chainMesh);
+
+// Big top poles (4 corners, red/white striped)
+[[-9,9],[9,9],[-9,-9],[9,-9]].forEach(([px,pz],pi)=>{
+  for(let ps=0;ps<9;ps++){
+    const pSeg=new THREE.Mesh(new THREE.CylinderGeometry(0.20,0.20,1.4,8),
+      pbr(ps%2===0?0xdd1010:0xf8f8f8,0.7));
+    pSeg.position.set(px,0.7+ps*1.4,pz); pSeg.castShadow=true; circusGroup.add(pSeg);
+  }
+  const pflag=new THREE.Mesh(new THREE.ConeGeometry(0.5,0.9,4),toon(pi%2===0?0xdd1010:0xffdd00));
+  pflag.position.set(px,13.6,pz); circusGroup.add(pflag);
+});
+// Banners between poles
+[[0,0.5],[1,1.5],[2,2.5],[3,3.5]].forEach(([i,mid])=>{
+  const ba=(mid/4)*Math.PI*2;
+  const bBanner=new THREE.Mesh(new THREE.PlaneGeometry(5.5,1.2),
+    new THREE.MeshToonMaterial({color:i%2===0?0xdd1010:0xffdd00,side:THREE.DoubleSide,gradientMap:GRAD}));
+  bBanner.position.set(Math.sin(ba)*10.5,9.5,Math.cos(ba)*10.5);
+  bBanner.rotation.y=ba+Math.PI/2; circusGroup.add(bBanner);
+});
+
+// Breakable starting crate
+const crateHalf=2.0; // box is 4×4 wide, 4 tall
+const crateMat=pbr(0x9a6020,0.85);
+const crateLineMat=pbr(0x5a3008,0.9);
+const crateWoodMat2=pbr(0x7a4a10,0.88);
+const boxPanels=[];
+[
+  // [localPos, flyDir]
+  [[crateHalf,crateHalf,0],        [1.8,0.4,0]],
+  [[-crateHalf,crateHalf,0],       [-1.8,0.4,0]],
+  [[0,crateHalf,crateHalf],        [0,0.4,1.8]],
+  [[0,crateHalf,-crateHalf],       [0,0.4,-1.8]],
+  [[0,crateHalf*2,0],              [0,3.0,0.6]],
+].forEach(([lp,fd],pi)=>{
+  const isTop=pi===4;
+  const pw=isTop?crateHalf*2:0.12, ph=isTop?0.12:crateHalf*2, pd=isTop?crateHalf*2:crateHalf*2;
+  const pm=new THREE.Mesh(new THREE.BoxGeometry(pw,ph,pd),crateMat);
+  pm.position.set(...lp); pm.castShadow=true;
+  circusGroup.add(pm);
+  boxPanels.push({mesh:pm, startPos:new THREE.Vector3(...lp), flyDir:new THREE.Vector3(...fd), flyRot:new THREE.Vector3((Math.random()-0.5)*4,(Math.random()-0.5)*3,(Math.random()-0.5)*4)});
+});
+
+// ── HENCHMEN ──────────────────────────────────────────────────
+function buildHench(hSkin,hShirt,hPants,hHairCol,hScale){
+  const ch=buildChar({skin:hSkin,shirt:hShirt,pants:hPants,hatCol:0x111111,band:0x111111,noHat:true});
+  ch.root.scale.setScalar(hScale||1.08);
+  const hHMat=new THREE.MeshToonMaterial({color:hHairCol,gradientMap:GRAD});
+  const hDome=new THREE.Mesh(new THREE.SphereGeometry(0.285,10,7,0,Math.PI*2,0,Math.PI*0.55),hHMat);
+  hDome.position.y=0.12; ch.head.add(hDome);
+  ch.root.visible=false; scene.add(ch.root);
+  return ch;
+}
+const h1Rig=buildHench(0xc88050,0x7020c0,0x3a0080,0x00ddaa);     // purple/teal hair
+const h2Rig=buildHench(0xe8b870,0xff6600,0x1a1a1a,0xffee00);     // orange/black, yellow hair
+const h3Rig=buildHench(0xa07050,0x209040,0x103820,0xff88cc);     // green, pink hair
+const h4Rig=buildHench(0xc8a880,0xe63946,0xf8f8f8,0xffffff);    // red/white, white hair
+
+const m2Henches=[h1Rig,h2Rig,h3Rig,h4Rig].map((rig,hi)=>({
+  rig,
+  pos:new THREE.Vector3(M2_CX+[5,-5,5,-5][hi],0,M2_CZ+[5,5,-5,-5][hi]),
+  hp:65, maxHp:65, speed:3.2, attackCd:0, facing:0,
+  dead:false, kbVel:new THREE.Vector3(), flash:0, stagger:0, fallT:-1,
+  hpBar:makeHpBar(rig.root,3.0,1.2),
+}));
+
+// ── BUNNY BOSS ────────────────────────────────────────────────
+const bunnyRig=(()=>{
+  const ch=buildChar({skin:0xf5d8b8,shirt:0xf8f8f8,pants:0xf8f8f8,hatCol:0xf8f8f8,band:0xf8f8f8,noHat:true});
+  ch.root.scale.setScalar(1.42);
+  // Blue curly hair
+  const bHMat=new THREE.MeshToonMaterial({color:0x2255dd,gradientMap:GRAD});
+  const bHDome=new THREE.Mesh(new THREE.SphereGeometry(0.30,12,8,0,Math.PI*2,0,Math.PI*0.56),bHMat);
+  bHDome.position.y=0.10; ch.head.add(bHDome);
+  [[-0.18,0.30,-0.02],[0.18,0.32,-0.02],[0,0.40,-0.04],[0.10,0.20,-0.10],[-0.10,0.22,-0.10]].forEach(([x,y,z])=>{
+    const curl=new THREE.Mesh(new THREE.SphereGeometry(0.09,6,5),bHMat);
+    curl.position.set(x,y,z); ch.head.add(curl);
+  });
+  // Red top hat
+  const hatM=toon(0xdd0010);
+  const hatBrim2=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.44,0.07,14),hatM);
+  hatBrim2.position.y=0.46; ch.head.add(hatBrim2);
+  const hatCrown2=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.27,0.62,12),hatM);
+  hatCrown2.position.y=0.80; ch.head.add(hatCrown2);
+  const hatTop2=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,0.04,12),hatM);
+  hatTop2.position.y=1.12; ch.head.add(hatTop2);
+  const hatBand2=new THREE.Mesh(new THREE.CylinderGeometry(0.235,0.24,0.09,12),toon(0xffffff));
+  hatBand2.position.y=0.54; ch.head.add(hatBand2);
+  // Big red nose
+  const noseMesh=new THREE.Mesh(new THREE.SphereGeometry(0.12,8,6),toon(0xff1010));
+  noseMesh.position.set(0,0,-0.30); ch.head.add(noseMesh);
+  // Polka dots on torso
+  [[0xff2020,0.18,0.18,-0.30],[0xffdd00,-0.17,0.09,-0.30],[0x00cc55,0.08,-0.12,-0.31],[0x2266ff,-0.17,-0.05,-0.29]].forEach(([col,x,y,z])=>{
+    const dot=new THREE.Mesh(new THREE.SphereGeometry(0.072,6,4),toon(col));
+    dot.position.set(x,y,z); ch.torso.add(dot);
+  });
+  // Frilly collar
+  const frillM=new THREE.Mesh(new THREE.TorusGeometry(0.26,0.075,5,14),toon(0xf8f8f8));
+  frillM.position.set(0,0.40,-0.10); ch.torso.add(frillM);
+  // Big red shoes
+  const shoeM2=toon(0xdd0010);
+  [ch.legR,ch.legL].forEach((leg,si)=>{
+    const shoe2=new THREE.Mesh(new THREE.CapsuleGeometry(0.12,0.46,4,6),shoeM2);
+    shoe2.position.set((si===0?-1:1)*0.04,-0.30,-0.14); shoe2.rotation.x=0.24; leg.shin.add(shoe2);
+  });
+  // Oversized mallet
+  const mG=new THREE.Group(); mG.position.set(0.44,0.22,0); ch.torso.add(mG);
+  const mShaft=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,1.0,8),pbr(0x5a3010,0.8));
+  mShaft.position.y=-0.52; mG.add(mShaft);
+  const mHead2=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.22,0.46,10),toon(0xdd0010));
+  mHead2.position.y=-1.12; mHead2.rotation.z=Math.PI/2; mG.add(mHead2);
+  ch.malletGroup=mG;
+  ch.root.visible=false; scene.add(ch.root);
+  return ch;
+})();
+const bunnyHpBar=makeHpBar(bunnyRig.root,4.8,2.6);
+const bunny2={
+  pos:new THREE.Vector3(M2_CX,0,M2_CZ-7),
+  hp:260, maxHp:260, speed:2.5, attackCd:0, facing:0,
+  dead:false, kbVel:new THREE.Vector3(), flash:0, stagger:0, fallT:-1,
+  active:false, swingT:-1,
+};
+
+// M2 state
+let m2Active=false, m2Phase='box'; // 'box'|'henchmen'|'boss'|'win'
+let m2BoxT=0, m2BoxOpen=false, m2BoxFlyT=0, m2DlgDone=false, m2HenchDead=0;
+const m2HenchEl=document.getElementById('m2-hench');
+
+function hitHench(h,range,dmg,dir,kbSpd,upward){
+  if(h.dead||player.pos.distanceTo(h.pos)>range) return;
+  h.hp=Math.max(0,h.hp-dmg);
+  h.kbVel.copy(dir).multiplyScalar(kbSpd);
+  if(upward) h.kbVel.y=3.8;
+  h.flash=0.18; h.stagger=0.38;
+  sfx.thud(); setHpBar(h.hpBar,h.hp/h.maxHp);
+  spawnSparks(h.pos.clone().add(new THREE.Vector3(0,1.5,0)));
+  if(h.hp<=0&&!h.dead){
+    h.dead=true; h.fallT=0; sfx.ko(); flashKO();
+    m2HenchDead++;
+    m2HenchEl.textContent='HENCHMEN: '+(4-m2HenchDead)+'/4 REMAINING';
+    if(m2HenchDead>=4){
+      m2Phase='boss';
+      bunny2.active=true;
+      bunnyRig.root.visible=true;
+      bunny2.pos.set(M2_CX,0,M2_CZ-7);
+      m2HenchEl.textContent='DEFEAT BUNNY!';
+    }
+  }
+}
+function hitBunny(dmg,dir,kbSpd,upward){
+  if(!bunny2.active||bunny2.dead) return;
+  bunny2.hp=Math.max(0,bunny2.hp-dmg);
+  bunny2.kbVel.copy(dir).multiplyScalar(kbSpd);
+  if(upward) bunny2.kbVel.y=2.5;
+  bunny2.flash=0.18; bunny2.stagger=0.42;
+  sfx.thud(); setHpBar(bunnyHpBar,bunny2.hp/bunny2.maxHp);
+  spawnSparks(bunny2.pos.clone().add(new THREE.Vector3(0,2.2,0)));
+  if(bunny2.hp<=0&&!bunny2.dead){
+    bunny2.dead=true; bunny2.fallT=0; sfx.ko();
+    m2Phase='win'; m2HenchEl.textContent='';
+    setTimeout(()=>{ winCircus(); },900);
+  }
+}
+function winCircus(){
+  const w=document.getElementById('win');
+  w.querySelector('h1').textContent='ESCAPED!';
+  const ps=w.querySelectorAll('p');
+  if(ps[0]) ps[0].textContent='THE CREW BREAKS FREE FROM THE CIRCUS.';
+  if(ps[1]) ps[1].textContent='THE ADVENTURE CONTINUES...';
+  if(ps[2]) ps[2].style.display='none';
+  w.classList.add('active');
+}
+function startM2(){
+  m2Active=true; m2Phase='box'; m2BoxT=0; m2BoxOpen=false; m2BoxFlyT=0;
+  m2DlgDone=false; m2HenchDead=0;
+  // Teleport player + crew to circus center
+  player.pos.set(M2_CX,0,M2_CZ); player.facing=0;
+  [playerRig,orozRig,noraRig].forEach((r,ri)=>{
+    r.root.position.set(M2_CX+(ri-1)*1.2,0,M2_CZ+(ri===1?0:0.8));
+  });
+  // Show circus
+  circusGroup.visible=true;
+  // Reset box panels
+  boxPanels.forEach(p=>{p.mesh.position.copy(p.startPos); p.mesh.rotation.set(0,0,0); p.mesh.visible=true;});
+  // Reset henchmen
+  m2Henches.forEach(h=>{ h.hp=h.maxHp; h.dead=false; h.fallT=-1; h.rig.root.visible=false; setHpBar(h.hpBar,1); });
+  // Reset bunny
+  bunny2.hp=bunny2.maxHp; bunny2.dead=false; bunny2.fallT=-1; bunny2.active=false;
+  bunnyRig.root.visible=false; setHpBar(bunnyHpBar,1);
+  // Snap camera to circus
+  camPos.set(M2_CX,8,M2_CZ+20);
+  camLook.set(M2_CX,1.4,M2_CZ);
+  m2HenchEl.style.display='';
+  m2HenchEl.textContent='DEFEAT THE HENCHMEN!';
+  // Dialogue plays immediately
+  setTimeout(()=>{
+    startDialogue([
+      {name:'NORA', text:'Oh no! We lost the map!'},
+      {name:'JENSOON', text:"Don't worry... it's in a safe place."},
+    ],()=>{ m2DlgDone=true; });
+  },600);
+}
+document.getElementById('cut-continue').addEventListener('click',()=>{
+  cutsceneActive=false;
+  cutsceneEl.classList.remove('active','dark');
+  setTimeout(()=>{ cutsceneEl.style.display='none'; },500);
+  startM2();
+});
+
 // ── POST-PROCESSING ───────────────────────────────────────────
 const composer=new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene,camera));
@@ -1161,15 +1427,21 @@ function tickKick(dt){
 }
 
 function checkPunchHits(){
-  marines.forEach(m=>hitMarine(m,4.0,25,player.punch.dir,5.5,false));
-  if(boss.active&&!boss.dead&&player.pos.distanceTo(boss.pos)<=5.5){
-    hitBoss(22,player.punch.dir,4.0,false);
+  if(!m2Active){
+    marines.forEach(m=>hitMarine(m,4.0,25,player.punch.dir,5.5,false));
+    if(boss.active&&!boss.dead&&player.pos.distanceTo(boss.pos)<=5.5) hitBoss(22,player.punch.dir,4.0,false);
+  } else {
+    m2Henches.forEach(h=>hitHench(h,4.5,25,player.punch.dir,5.5,false));
+    hitBunny(22,player.punch.dir,4.0,false);
   }
 }
 function checkKickHits(){
-  marines.forEach(m=>hitMarine(m,3.0,18,player.kick.dir,7.0,true));
-  if(boss.active&&!boss.dead&&player.pos.distanceTo(boss.pos)<=3.5){
-    hitBoss(15,player.kick.dir,6.0,true);
+  if(!m2Active){
+    marines.forEach(m=>hitMarine(m,3.0,18,player.kick.dir,7.0,true));
+    if(boss.active&&!boss.dead&&player.pos.distanceTo(boss.pos)<=3.5) hitBoss(15,player.kick.dir,6.0,true);
+  } else {
+    m2Henches.forEach(h=>hitHench(h,3.5,18,player.kick.dir,7.0,true));
+    hitBunny(15,player.kick.dir,6.0,true);
   }
 }
 
@@ -1284,8 +1556,14 @@ function loop(){
   if(moving){
     mv.normalize();
     player.pos.addScaledVector(mv,player.speed*dt);
-    player.pos.x=Math.max(-60,Math.min(60,player.pos.x));
-    player.pos.z=Math.max(-60,Math.min(60,player.pos.z));
+    if(!m2Active){
+      player.pos.x=Math.max(-60,Math.min(60,player.pos.x));
+      player.pos.z=Math.max(-60,Math.min(60,player.pos.z));
+    } else {
+      const bdx=player.pos.x-M2_CX, bdz=player.pos.z-M2_CZ;
+      const bd2=bdx*bdx+bdz*bdz;
+      if(bd2>10.5*10.5){ const bd=Math.sqrt(bd2); player.pos.x=M2_CX+bdx/bd*10.5; player.pos.z=M2_CZ+bdz/bd*10.5; }
+    }
     const want=Math.atan2(-mv.x,-mv.z);
     let diff=want-player.facing;
     while(diff>Math.PI)diff-=Math.PI*2; while(diff<-Math.PI)diff+=Math.PI*2;
@@ -1317,18 +1595,18 @@ function loop(){
   activeRig.root.rotation.y=player.facing;
   tickPunch(dt); tickKick(dt);
 
-  // ── WATER DAMAGE ──
-  // Island is a ~38-unit ellipse centered at (0,-2), scaled Z x1.05
+  // ── WATER DAMAGE (M1 only) ──
+  if(!m2Active){
   const wx=player.pos.x, wz=(player.pos.z+2)/1.05;
   if(Math.sqrt(wx*wx+wz*wz)>38){
     waterDmgTimer+=dt;
     if(waterDmgTimer>=0.5){ damagePlayer(12); waterDmgTimer=0; }
-    // Blue tint flash instead of red while in water
     dmgFlash.style.background=`rgba(20,80,160,${0.18+Math.sin(total*8)*0.08})`;
   } else {
     waterDmgTimer=0;
     if(dmgFlash.style.background.startsWith('rgba(20')){ dmgFlash.style.background='rgba(230,57,70,0)'; }
   }
+  } // end !m2Active water damage
 
   // ── JENSOON FOLLOWS (when not active) ──
   if(activeRig!==playerRig){
@@ -1448,6 +1726,8 @@ function loop(){
     interactEl.style.opacity='0'; interactTarget=null;
   }
 
+  // ── M1 ENEMIES (skip in M2) ──
+  if(!m2Active){
   // ── MARINES ──
   marines.forEach(m=>{
     if(m.dead){
@@ -1564,6 +1844,107 @@ function loop(){
     bossRig.allMats.forEach(m=>m.color.lerp(gray,0.04));
   }
 
+  } // end !m2Active enemies
+
+  // ── M2 ENEMIES ──
+  if(m2Active){
+    // Box break countdown
+    if(m2Phase==='box'&&m2DlgDone&&!m2BoxOpen){
+      m2BoxT+=dt;
+      if(m2BoxT>=3){
+        m2BoxOpen=true;
+        m2Phase='henchmen';
+        m2Henches.forEach(h=>{ h.rig.root.visible=true; h.pos.copy(new THREE.Vector3(M2_CX,0,M2_CZ).add(h.pos.clone().sub(new THREE.Vector3(M2_CX,0,M2_CZ)))); });
+        m2Henches.forEach((h,hi)=>{ h.pos.set(M2_CX+[5,-5,5,-5][hi],0,M2_CZ+[5,5,-5,-5][hi]); });
+      }
+    }
+    // Box fly-out animation
+    if(m2BoxOpen){
+      m2BoxFlyT=Math.min(m2BoxFlyT+dt*1.4,1.0);
+      const ef=1-Math.pow(1-m2BoxFlyT,3);
+      boxPanels.forEach(p=>{
+        p.mesh.position.copy(p.startPos).addScaledVector(p.flyDir,ef*9);
+        p.mesh.rotation.x=p.flyRot.x*ef;
+        p.mesh.rotation.y=p.flyRot.y*ef;
+        p.mesh.rotation.z=p.flyRot.z*ef;
+        if(m2BoxFlyT>=1.0) p.mesh.visible=false;
+      });
+    }
+    // Henchmen AI
+    if(m2Phase==='henchmen'||m2Phase==='boss'){
+      m2Henches.forEach(h=>{
+        if(h.dead){
+          if(h.fallT>=0){
+            h.fallT=Math.min(h.fallT+dt,0.55);
+            const fe=1-Math.pow(1-h.fallT/0.55,2);
+            h.rig.root.rotation.z=fe*(Math.PI/2);
+            h.rig.root.position.y=-fe*0.4;
+            h.rig.allMats.forEach(m=>m.color.lerp(new THREE.Color(0.4,0.4,0.4),0.05));
+          }
+          return;
+        }
+        // Knockback
+        h.kbVel.y-=22*dt; h.kbVel.multiplyScalar(Math.pow(0.08,dt));
+        h.pos.addScaledVector(h.kbVel,dt);
+        // Circular bound
+        const hbdx=h.pos.x-M2_CX, hbdz=h.pos.z-M2_CZ;
+        const hbd2=hbdx*hbdx+hbdz*hbdz;
+        if(hbd2>10.8*10.8){ const hbd=Math.sqrt(hbd2); h.pos.x=M2_CX+hbdx/hbd*10.8; h.pos.z=M2_CZ+hbdz/hbd*10.8; }
+        h.pos.y=Math.max(0,h.pos.y);
+        if(h.stagger>0){ h.stagger-=dt; }
+        else {
+          // Chase player
+          const toP2=new THREE.Vector3(player.pos.x-h.pos.x,0,player.pos.z-h.pos.z);
+          const dist2=toP2.length();
+          if(dist2>1.4){ toP2.normalize(); h.pos.x+=toP2.x*h.speed*dt; h.pos.z+=toP2.z*h.speed*dt; h.facing=Math.atan2(toP2.x,toP2.z); }
+          h.attackCd-=dt;
+          if(dist2<1.8&&h.attackCd<=0){ damagePlayer(7); h.attackCd=2.2; }
+        }
+        h.rig.root.position.set(h.pos.x,h.pos.y,h.pos.z);
+        h.rig.root.rotation.y=h.facing;
+        if(h.flash>0){ h.flash-=dt; h.rig.allMats.forEach(m=>m.emissive&&(m.emissive.setScalar(h.flash>0?0.55:0))); }
+        setHpBar(h.hpBar,h.hp/h.maxHp);
+      });
+    }
+    // Bunny AI
+    if(m2Phase==='boss'&&bunny2.active&&!bunny2.dead){
+      bunny2.kbVel.y-=22*dt; bunny2.kbVel.multiplyScalar(Math.pow(0.08,dt));
+      bunny2.pos.addScaledVector(bunny2.kbVel,dt);
+      const bbdx=bunny2.pos.x-M2_CX, bbdz=bunny2.pos.z-M2_CZ;
+      const bbd2=bbdx*bbdx+bbdz*bbdz;
+      if(bbd2>10.5*10.5){ const bbd=Math.sqrt(bbd2); bunny2.pos.x=M2_CX+bbdx/bbd*10.5; bunny2.pos.z=M2_CZ+bbdz/bbd*10.5; }
+      bunny2.pos.y=Math.max(0,bunny2.pos.y);
+      if(bunny2.stagger>0){ bunny2.stagger-=dt; }
+      else {
+        const btoP=new THREE.Vector3(player.pos.x-bunny2.pos.x,0,player.pos.z-bunny2.pos.z);
+        const bdist=btoP.length();
+        if(bdist>1.6){ btoP.normalize(); bunny2.pos.x+=btoP.x*bunny2.speed*dt; bunny2.pos.z+=btoP.z*bunny2.speed*dt; bunny2.facing=Math.atan2(btoP.x,btoP.z); }
+        bunny2.attackCd-=dt;
+        if(bdist<2.2&&bunny2.attackCd<=0){ damagePlayer(12); bunny2.attackCd=2.5; bunny2.swingT=0; sfx.boss(); }
+      }
+      // Mallet swing animation
+      if(bunny2.swingT>=0){
+        bunny2.swingT=Math.min(bunny2.swingT+dt,1.0);
+        const bsw=bunny2.swingT;
+        if(bsw<0.25){ bunnyRig.malletGroup.rotation.x=-(bsw/0.25)*1.6; }
+        else if(bsw<0.55){ bunnyRig.malletGroup.rotation.x=-1.6+((bsw-0.25)/0.30)*3.4; }
+        else { bunnyRig.malletGroup.rotation.x=(1.8)*(1-(bsw-0.55)/0.45); }
+        if(bunny2.swingT>=1.0){ bunny2.swingT=-1; bunnyRig.malletGroup.rotation.set(0,0,0); }
+      }
+      bunnyRig.root.position.set(bunny2.pos.x,bunny2.pos.y,bunny2.pos.z);
+      bunnyRig.root.rotation.y=bunny2.facing;
+      if(bunny2.flash>0){ bunny2.flash-=dt; bunnyRig.allMats.forEach(m=>m.emissive&&(m.emissive.setScalar(bunny2.flash>0?0.55:0))); }
+      setHpBar(bunnyHpBar,bunny2.hp/bunny2.maxHp);
+    }
+    if(bunny2.dead&&bunny2.fallT>=0){
+      bunny2.fallT=Math.min(bunny2.fallT+dt,0.7);
+      const bfe=1-Math.pow(1-bunny2.fallT/0.7,2);
+      bunnyRig.root.rotation.z=bfe*(Math.PI/2);
+      bunnyRig.root.position.y=-bfe*0.5;
+      bunnyRig.allMats.forEach(m=>m.color&&m.color.lerp(new THREE.Color(0.35,0.35,0.35),0.04));
+    }
+  } // end m2Active enemies
+
   tickSparks(dt);
 
   // ── CAMERA ──
@@ -1575,14 +1956,16 @@ function loop(){
   }
   const rotOff=CAM_OFF.clone().applyAxisAngle(new THREE.Vector3(0,1,0),camYaw);
 
-  // Zoom in if a building is between player and camera
+  // Zoom in if a building is between player and camera (M1 only)
   const hx=rotOff.x, hz=rotOff.z;
   const hLen=Math.sqrt(hx*hx+hz*hz);
   const hdx=hx/hLen, hdz=hz/hLen;
   let occDist=hLen;
-  for(const [x1,x2,z1,z2] of COLLIDERS){
-    const t=rayAABB(player.pos.x,player.pos.z,hdx,hdz,hLen,x1,x2,z1,z2);
-    if(t<occDist) occDist=Math.max(1.4,t-0.5);
+  if(!m2Active){
+    for(const [x1,x2,z1,z2] of COLLIDERS){
+      const t=rayAABB(player.pos.x,player.pos.z,hdx,hdz,hLen,x1,x2,z1,z2);
+      if(t<occDist) occDist=Math.max(1.4,t-0.5);
+    }
   }
   const sc=occDist/hLen;
   const camTarget=player.pos.clone().add(
