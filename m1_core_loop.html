@@ -138,6 +138,14 @@ canvas { display:block; }
 <div id="m2-hench"></div>
 <div id="cut-sub"></div>
 
+<script>
+window.addEventListener('error',e=>{
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;top:10px;left:10px;right:10px;background:#900;color:#fff;padding:14px;font-family:monospace;font-size:12px;z-index:99999;border-radius:6px;white-space:pre-wrap;pointer-events:none';
+  d.textContent='JS ERROR: '+e.message+'\n'+e.filename+':'+e.lineno;
+  document.body.appendChild(d);
+});
+</script>
 <script type="importmap">
 {"imports":{
   "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -961,11 +969,12 @@ for(let ci=0;ci<crowdN;ci++){
   circusGroup.add(cFig);
   chainPts.push(cFig.position.clone().add(new THREE.Vector3(0,0.3,0)));
 }
-// closed=true handles wrap-around; do NOT add a duplicate endpoint
-const chainCurve=new THREE.CatmullRomCurve3(chainPts,true);
+// Chain as a flat torus ring at crowd height
 const chainMesh=new THREE.Mesh(
-  new THREE.TubeGeometry(chainCurve,crowdN*4,0.055,6,true),
+  new THREE.TorusGeometry(15.0,0.07,6,60),
   new THREE.MeshToonMaterial({color:0xb8b8b8,gradientMap:GRAD}));
+chainMesh.rotation.x=Math.PI/2;
+chainMesh.position.y=1.15;
 circusGroup.add(chainMesh);
 
 // Big top poles (4 corners, red/white striped)
