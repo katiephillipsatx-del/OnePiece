@@ -1109,12 +1109,16 @@ const bunnyRig=(()=>{
     fringe.position.set(x,0.16,0); ch.torso.add(fringe);
   });
   ch.allMats.push(epMat);
-  // White fur coat (full open cylinder — voluminous)
-  const coatM=toon(0xf8f8f8);
-  const coat=new THREE.Mesh(new THREE.CylinderGeometry(0.82,0.68,1.08,16,1,true),coatM);
-  coat.position.set(0,-0.12,0); ch.torso.add(coat);
-  const collar=new THREE.Mesh(new THREE.CylinderGeometry(0.60,0.82,0.20,16,1,true),coatM);
-  collar.position.set(0,0.44,0); ch.torso.add(collar);
+  // White fur coat — open coat with back panel + front lapels (distinct from cape)
+  const coatM=new THREE.MeshToonMaterial({color:0xf8f8f8,gradientMap:GRAD,side:THREE.DoubleSide});
+  const coatBack=new THREE.Mesh(new THREE.PlaneGeometry(0.92,1.32),coatM);
+  coatBack.position.set(0,-0.14,0.34); coatBack.rotation.y=Math.PI; ch.torso.add(coatBack);
+  const lapelL=new THREE.Mesh(new THREE.PlaneGeometry(0.38,1.12),coatM);
+  lapelL.position.set(-0.30,-0.10,-0.20); lapelL.rotation.y=Math.PI*0.14; ch.torso.add(lapelL);
+  const lapelR=new THREE.Mesh(new THREE.PlaneGeometry(0.38,1.12),coatM);
+  lapelR.position.set( 0.30,-0.10,-0.20); lapelR.rotation.y=-Math.PI*0.14; ch.torso.add(lapelR);
+  const coatCollar=new THREE.Mesh(new THREE.TorusGeometry(0.44,0.10,5,14,Math.PI*1.6),coatM);
+  coatCollar.position.set(0,0.42,0.04); coatCollar.rotation.x=Math.PI*0.35; ch.torso.add(coatCollar);
   ch.allMats.push(coatM);
   // White gloves on hands
   const gloveM=toon(0xf8f8f8);
