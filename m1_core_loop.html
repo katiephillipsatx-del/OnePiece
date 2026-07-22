@@ -1193,6 +1193,10 @@ function spawnHenchWave(wave){
 }
 function hitHench(h,range,dmg,dir,kbSpd,upward){
   if(h.dead||!h.spawned||player.pos.distanceTo(h.pos)>range) return;
+  damageHenchCore(h,dmg,dir,kbSpd,upward);
+}
+function damageHenchCore(h,dmg,dir,kbSpd,upward){
+  if(h.dead||!h.spawned) return;
   h.hp=Math.max(0,h.hp-dmg);
   h.kbVel.copy(dir).multiplyScalar(kbSpd);
   if(upward) h.kbVel.y=3.8;
@@ -1579,6 +1583,10 @@ function checkKickHits(){
 
 function hitMarine(m,range,dmg,dir,kbSpd,upward){
   if(m.dead||player.pos.distanceTo(m.pos)>range) return;
+  damageMarineCore(m,dmg,dir,kbSpd,upward);
+}
+function damageMarineCore(m,dmg,dir,kbSpd,upward){
+  if(m.dead) return;
   m.hp=Math.max(0,m.hp-dmg);
   m.kbVel.copy(dir).multiplyScalar(kbSpd);
   if(upward) m.kbVel.y=3.8;
@@ -1621,6 +1629,60 @@ function winGame(){
 function flashKO(){
   const el=document.getElementById('ko'); el.style.opacity='1';
   setTimeout(()=>el.style.opacity='0',1100);
+}
+
+// ── CREW COMPANION COMBAT ─────────────────────────────────────
+const compCd={jen:0,kobe:0,nora:0,oroz:0};
+const compSwing={jen:-1,kobe:-1,nora:-1};
+function nearestEnemy(p){
+  let best=null,bd=Infinity;
+  if(!m2Active){
+    marines.forEach(m=>{ if(m.dead) return; const d=p.distanceTo(m.pos); if(d<bd){bd=d;best={kind:'marine',obj:m,pos:m.pos};} });
+    if(boss.active&&!boss.dead){ const d=p.distanceTo(boss.pos); if(d<bd){bd=d;best={kind:'boss',obj:boss,pos:boss.pos};} }
+  } else if(m2Phase==='henchmen'||m2Phase==='boss'){
+    m2Henches.forEach(h=>{ if(h.dead||!h.spawned) return; const d=p.distanceTo(h.pos); if(d<bd){bd=d;best={kind:'hench',obj:h,pos:h.pos};} });
+    if(m2Phase==='boss'&&bunny2.active&&!bunny2.dead){ const d=p.distanceTo(bunny2.pos); if(d<bd){bd=d;best={kind:'bunny',obj:bunny2,pos:bunny2.pos};} }
+  }
+  if(best) best.dist=bd;
+  return best;
+}
+function companionDamage(t,dmg,fromPos){
+  const dir=new THREE.Vector3(t.pos.x-fromPos.x,0,t.pos.z-fromPos.z).normalize();
+  if(t.kind==='marine') damageMarineCore(t.obj,dmg,dir,4.0,false);
+  else if(t.kind==='boss') hitBoss(dmg,dir,2.0,false);
+  else if(t.kind==='hench') damageHenchCore(t.obj,dmg,dir,4.0,false);
+  else hitBunny(dmg,dir,2.0,false);
+}
+// Chase + attack the nearest enemy. Returns true while engaged
+// (caller should skip its follow logic that frame).
+function companionCombat(rig,key,dmg,spd,animOff,dt,useSword){
+  compCd[key]=Math.max(0,compCd[key]-dt);
+  const t=nearestEnemy(rig.root.position);
+  if(!t||t.dist>9.5) return false;
+  const toT=new THREE.Vector3(t.pos.x-rig.root.position.x,0,t.pos.z-rig.root.position.z);
+  const d=toT.length();
+  rig.root.rotation.y=Math.atan2(toT.x,toT.z);
+  if(d>1.9){
+    toT.normalize();
+    rig.root.position.addScaledVector(toT,spd*dt);
+    walkAnim(rig,total*spd*3.0+animOff);
+  } else {
+    idleAnim(rig,total+animOff);
+    if(compCd[key]<=0){
+      companionDamage(t,dmg,rig.root.position);
+      compCd[key]=2.4;
+      if(useSword) orozSwingT=0; else compSwing[key]=0;
+    }
+  }
+  // Punch arm swing overlay
+  if(compSwing[key]!==undefined&&compSwing[key]>=0){
+    compSwing[key]+=dt;
+    const sw=compSwing[key];
+    rig.armR.sp.rotation.x= sw<0.15 ? -(sw/0.15)*1.5 : -1.5+((sw-0.15)/0.25)*1.5;
+    if(sw>=0.4){ compSwing[key]=-1; rig.armR.sp.rotation.x=0; }
+  }
+  rig.root.position.y=Math.max(0,rig.root.position.y);
+  return true;
 }
 
 // ── SPARKS ────────────────────────────────────────────────────
@@ -1740,32 +1802,36 @@ function loop(){
   }
   } // end !m2Active water damage
 
-  // ── JENSOON FOLLOWS (when not active) ──
+  // ── JENSOON FOLLOWS / FIGHTS (when not active) ──
   if(activeRig!==playerRig){
-    const jTarget=new THREE.Vector3(player.pos.x+1.5,0,player.pos.z+1.0);
-    const jDelta=jTarget.clone().sub(playerRig.root.position);
-    if(jDelta.length()>2.2){
-      jDelta.normalize();
-      playerRig.root.position.addScaledVector(jDelta,player.speed*0.88*dt);
+    if(!companionCombat(playerRig,'jen',12,4.4,0.7,dt)){
+      const jTarget=new THREE.Vector3(player.pos.x+1.5,0,player.pos.z+1.0);
+      const jDelta=jTarget.clone().sub(playerRig.root.position);
+      if(jDelta.length()>2.2){
+        jDelta.normalize();
+        playerRig.root.position.addScaledVector(jDelta,player.speed*0.88*dt);
+      }
+      playerRig.root.rotation.y=Math.atan2(
+        player.pos.x-playerRig.root.position.x,
+        player.pos.z-playerRig.root.position.z);
+      idleAnim(playerRig,total+0.7);
     }
-    playerRig.root.rotation.y=Math.atan2(
-      player.pos.x-playerRig.root.position.x,
-      player.pos.z-playerRig.root.position.z);
-    idleAnim(playerRig,total+0.7);
   }
 
-  // ── KOBE FOLLOWS ──
+  // ── KOBE FOLLOWS / FIGHTS ──
   if(activeRig!==kobeRig&&kobeRig.root.visible){
-    const kobeTarget=new THREE.Vector3(player.pos.x-2,0,player.pos.z+1.2);
-    const kobeDelta=kobeTarget.sub(kobeRig.root.position);
-    if(kobeDelta.length()>2.4){
-      kobeDelta.normalize();
-      kobeRig.root.position.addScaledVector(kobeDelta,player.speed*0.88*dt);
+    if(!companionCombat(kobeRig,'kobe',10,4.2,1.3,dt)){
+      const kobeTarget=new THREE.Vector3(player.pos.x-2,0,player.pos.z+1.2);
+      const kobeDelta=kobeTarget.sub(kobeRig.root.position);
+      if(kobeDelta.length()>2.4){
+        kobeDelta.normalize();
+        kobeRig.root.position.addScaledVector(kobeDelta,player.speed*0.88*dt);
+      }
+      kobeRig.root.rotation.y=Math.atan2(
+        player.pos.x-kobeRig.root.position.x,
+        player.pos.z-kobeRig.root.position.z);
+      idleAnim(kobeRig,total+1.3);
     }
-    kobeRig.root.rotation.y=Math.atan2(
-      player.pos.x-kobeRig.root.position.x,
-      player.pos.z-kobeRig.root.position.z);
-    idleAnim(kobeRig,total+1.3);
   }
 
   kobeFaceGroup.scale.z=(activeRig===kobeRig)?-1:1;
@@ -1798,33 +1864,8 @@ function loop(){
 
   // ── OROZ FOLLOWS / FIGHTS AFTER FREED ──
   if(orozFreed&&activeRig!==orozRig){
-    orozAttackCd=Math.max(0,orozAttackCd-dt);
-    if(boss.active&&!boss.dead){
-      // Oroz charges the boss
-      const ob=new THREE.Vector3(boss.pos.x,0,boss.pos.z);
-      const toB=ob.clone().sub(orozRig.root.position);
-      const distB=toB.length();
-      if(distB>1.8){
-        toB.normalize();
-        orozRig.root.position.addScaledVector(toB,2.6*dt);
-        orozRig.root.rotation.y=Math.atan2(toB.x,toB.z);
-        walkAnim(orozRig,total*2.6*3.0);
-      } else {
-        orozRig.root.rotation.y=Math.atan2(boss.pos.x-orozRig.root.position.x,boss.pos.z-orozRig.root.position.z);
-        idleAnim(orozRig,total+2.5);
-        if(orozAttackCd<=0){
-          // Slash the boss
-          boss.hp=Math.max(0,boss.hp-14);
-          boss.flash=0.18; boss.stagger=0.35;
-          setHpBar(bossHpBar,boss.hp/boss.maxHp);
-          spawnSparks(boss.pos.clone().add(new THREE.Vector3(0,2.2,0)));
-          sfx.thud();
-          orozAttackCd=2.8; orozSwingT=0;
-          if(boss.hp<=0&&!boss.dead){ boss.dead=true; boss.fallT=0; sfx.ko(); winGame(); }
-        }
-      }
-    } else {
-      // Follow player when no boss fight
+    if(!companionCombat(orozRig,'oroz',14,2.6,2.5,dt,true)){
+      // Follow player when no enemies near
       const ot=new THREE.Vector3(player.pos.x+2,0,player.pos.z+0.8);
       const od=ot.clone().sub(orozRig.root.position);
       if(od.length()>2.2){ od.normalize(); orozRig.root.position.addScaledVector(od,player.speed*0.84*dt); }
@@ -1844,6 +1885,17 @@ function loop(){
   if(noraQuest&&!noraFound){
     idleAnim(noraRig,total+3.1);
     noraRig.root.rotation.y=Math.atan2(player.pos.x-noraRig.root.position.x,player.pos.z-noraRig.root.position.z);
+  }
+
+  // ── NORA FOLLOWS / FIGHTS AFTER JOINING ──
+  if(noraFound){
+    if(!companionCombat(noraRig,'nora',10,4.2,3.1,dt)){
+      const nt=new THREE.Vector3(player.pos.x+0.5,0,player.pos.z+2.0);
+      const nd=nt.clone().sub(noraRig.root.position);
+      if(nd.length()>2.6){ nd.normalize(); noraRig.root.position.addScaledVector(nd,player.speed*0.86*dt); }
+      noraRig.root.rotation.y=Math.atan2(player.pos.x-noraRig.root.position.x,player.pos.z-noraRig.root.position.z);
+      idleAnim(noraRig,total+3.1);
+    }
   }
 
   // ── INTERACT CHECK ──
