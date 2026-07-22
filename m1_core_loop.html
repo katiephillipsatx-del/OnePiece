@@ -94,7 +94,7 @@ canvas { display:block; }
   <div id="crew">
     <div class="c-title">CREW</div>
     <div class="c-member">⚓ Jensoon</div>
-    <div class="c-member" id="cm-kobe">· Kobe</div>
+    <div class="c-member" id="cm-kobe">· Kobe (future marine)</div>
     <div class="c-member" id="cm-oroz" style="opacity:0.3">· Oroz (imprisoned)</div>
     <div class="c-member" id="cm-nora" style="display:none">🧭 Nora (Navigator)</div>
   </div>
@@ -1359,28 +1359,43 @@ function hitPirate(p,range,dmg,dir,kbSpd,upward){
     }
   }
 }
+let m0FinT=-1, m0FinHit=false, m0FinDone=false;
 function hitFatLady(dmg,dir,kbSpd,upward){
-  if(!fatLady.active||fatLady.dead) return;
-  fatLady.hp=Math.max(0,fatLady.hp-dmg);
+  if(!fatLady.active||fatLady.dead||m0FinT>=0) return;
+  const nh=fatLady.hp-dmg;
   fatLady.kbVel.copy(dir).multiplyScalar(kbSpd);
   if(upward) fatLady.kbVel.y=2.2;
   fatLady.flash=0.18; fatLady.stagger=0.42;
-  sfx.thud(); setHpBar(fatLadyHpBar,fatLady.hp/fatLady.maxHp);
+  sfx.thud();
   spawnSparks(fatLady.pos.clone().add(new THREE.Vector3(0,2.2,0)));
-  if(fatLady.hp<=0&&!fatLady.dead){
-    fatLady.dead=true; fatLady.fallT=0; sfx.ko(); flashKO();
-    m0Phase='win'; m2HenchEl.textContent='';
-    setTimeout(()=>{
-      startDialogue([
-        {name:'KOBE',   text:'You beat her! She made me scrub decks all day...'},
-        {name:'JENSOON',text:'Come with me! Join my crew!'},
-        {name:'KOBE',   text:"Aye! Let's sail to the marine island!"},
-      ],()=>{ endM0(); });
-    },900);
+  if(!m0FinDone&&nh<=22){
+    // One hit left — Jensoon finishes her with the Rubber Rocket
+    fatLady.hp=nh>0?nh:15;
+    setHpBar(fatLadyHpBar,fatLady.hp/fatLady.maxHp);
+    m0FinT=0; m0FinHit=false;
+    showSub('JENSOON: RUBBER ROCKET!!',2.2);
+    return;
   }
+  fatLady.hp=Math.max(0,nh);
+  setHpBar(fatLadyHpBar,fatLady.hp/fatLady.maxHp);
+}
+function fatLadyDefeated(){
+  fatLady.dead=true; fatLady.fallT=0; fatLady.hp=0;
+  setHpBar(fatLadyHpBar,0.001);
+  sfx.ko(); flashKO();
+  m0Phase='win'; m2HenchEl.textContent='';
+  setTimeout(()=>{
+    startDialogue([
+      {name:'KOBE',   text:'You beat her! She kidnapped me and made me scrub the decks...'},
+      {name:'KOBE',   text:'My dream is to become a marine!'},
+      {name:'JENSOON',text:"Then I'll take you to the marine base island!"},
+      {name:'KOBE',   text:"Until we get there, I'll help you. Let's sail!"},
+    ],()=>{ endM0(); });
+  },900);
 }
 function startM0(){
   m0Active=true; m0Phase='intro'; m0PiratesDead=0;
+  m0FinT=-1; m0FinHit=false; m0FinDone=false;
   player.pos.set(M0_CX,0,M0_CZ+8); player.facing=0;
   playerRig.root.position.set(M0_CX,0,M0_CZ+8);
   kobeRig.root.position.set(M0_CX+3.6,0,M0_CZ+9.5);
@@ -1402,7 +1417,7 @@ function endM0(){
   playerRig.root.position.set(0,0,22);
   kobeRig.root.position.set(-2.5,0,23);
   camPos.set(0,8,34); camLook.set(0,1.4,22);
-  m2HenchEl.textContent='KOBE JOINED THE CREW!';
+  m2HenchEl.textContent='KOBE TAGS ALONG — DREAMING OF BECOMING A MARINE!';
   setTimeout(()=>{ if(!m2Active) m2HenchEl.textContent=''; },2600);
 }
 
@@ -2215,6 +2230,34 @@ function loop(){
       fatLadyRig.root.rotation.y=fatLady.facing;
       if(fatLady.flash>0){ fatLady.flash-=dt; fatLadyRig.allMats.forEach(m=>m.emissive&&(m.emissive.setScalar(fatLady.flash>0?0.55:0))); }
       setHpBar(fatLadyHpBar,fatLady.hp/fatLady.maxHp);
+    }
+    // Rubber Rocket finisher — wind up, stretch-punch, retract
+    if(m0FinT>=0){
+      m0FinT+=dt;
+      const ftoF=new THREE.Vector3(fatLady.pos.x-player.pos.x,0,fatLady.pos.z-player.pos.z);
+      player.facing=Math.atan2(-ftoF.x,-ftoF.z);
+      const fArm=playerRig.armR;
+      if(m0FinT<0.9){
+        fArm.sp.rotation.x=(m0FinT/0.9)*2.4; // arm winds way back
+      } else if(m0FinT<1.15){
+        const fp=(m0FinT-0.9)/0.25;
+        fArm.sp.rotation.x=2.4-fp*4.0;       // snap forward
+        fArm.sp.scale.y=1+fp*3.2;            // arm stretches across the deck
+        if(!m0FinHit&&fp>0.7){
+          m0FinHit=true;
+          fatLady.kbVel.copy(ftoF.clone().normalize()).multiplyScalar(7);
+          fatLady.kbVel.y=3;
+          spawnSparks(fatLady.pos.clone().add(new THREE.Vector3(0,2.2,0)));
+          fatLadyDefeated();
+        }
+      } else if(m0FinT<1.6){
+        const fp=(m0FinT-1.15)/0.45;
+        fArm.sp.rotation.x=-1.6+fp*1.6;
+        fArm.sp.scale.y=4.2-fp*3.2;
+      } else {
+        fArm.sp.rotation.x=0; fArm.sp.scale.y=1;
+        m0FinT=-1; m0FinDone=true;
+      }
     }
     // Fat Lady fall
     if(fatLady.dead&&fatLady.fallT>=0){
