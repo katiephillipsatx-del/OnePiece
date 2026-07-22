@@ -1180,6 +1180,232 @@ let m2BoxT=0, m2BoxOpen=false, m2BoxFlyT=0, m2DlgDone=false, m2HenchDead=0;
 let m2CamT=0, m2DlgStarted=false;
 const m2HenchEl=document.getElementById('m2-hench');
 
+// ── M0: FAT LADY'S SHIP ───────────────────────────────────────
+const M0_CX=300, M0_CZ=0;
+let m0Active=false, m0Phase='intro'; // 'intro'|'crew'|'boss'|'win'
+let m0PiratesDead=0, kobeJoined=false;
+
+const m0Group=new THREE.Group();
+m0Group.position.set(M0_CX,0,M0_CZ);
+scene.add(m0Group);
+
+// Hull + deck
+const m0HullMat=pbr(0x6a4020,0.85);
+const m0Hull=new THREE.Mesh(new THREE.BoxGeometry(11,2.6,26),m0HullMat);
+m0Hull.position.y=-1.2; m0Group.add(m0Hull);
+const m0Bow=new THREE.Mesh(new THREE.ConeGeometry(5.5,7,4),m0HullMat);
+m0Bow.position.set(0,-1.2,-16); m0Bow.rotation.x=-Math.PI/2; m0Group.add(m0Bow);
+const m0Deck=new THREE.Mesh(new THREE.BoxGeometry(10,0.3,24),WOOD);
+m0Deck.position.y=-0.15; m0Deck.receiveShadow=true; m0Group.add(m0Deck);
+// Railings
+[[5,0,0.25,24],[-5,0,0.25,24],[0,12,10.4,0.25],[0,-12,10.4,0.25]].forEach(([rx,rz,rw,rd])=>{
+  const rail=new THREE.Mesh(new THREE.BoxGeometry(rw,1.0,rd),m0HullMat);
+  rail.position.set(rx,0.5,rz); m0Group.add(rail);
+});
+// Raised stern castle (behind the play area)
+const m0Stern=new THREE.Mesh(new THREE.BoxGeometry(10,1.8,5),m0HullMat);
+m0Stern.position.set(0,0.9,14.5); m0Group.add(m0Stern);
+// Masts + sails
+[[-5],[5]].forEach(([mz])=>{
+  const mMast=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.26,14,8),WOOD);
+  mMast.position.set(0,7,mz); mMast.castShadow=true; m0Group.add(mMast);
+  const mSail=new THREE.Mesh(new THREE.PlaneGeometry(7,4.5),
+    new THREE.MeshStandardMaterial({color:0xe8e0d0,roughness:0.9,side:THREE.DoubleSide}));
+  mSail.position.set(0,8.5,mz-0.4); m0Group.add(mSail);
+});
+// Dark pirate flag
+const m0Flag=new THREE.Mesh(new THREE.PlaneGeometry(2.2,1.3),
+  new THREE.MeshStandardMaterial({color:0x1a1a2a,roughness:0.85,side:THREE.DoubleSide}));
+m0Flag.position.set(1.1,14.4,-5); m0Group.add(m0Flag);
+// Barrels + crates
+[[3.6,-6],[-3.8,2],[4,8],[-3.6,-9]].forEach(([bx,bz])=>{
+  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.46,0.95,10),pbr(0x7a4a10,0.85));
+  barrel.position.set(bx,0.48,bz); barrel.castShadow=true; m0Group.add(barrel);
+});
+const m0Crate=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.1,1.1),WOOD);
+m0Crate.position.set(-4,0.55,7); m0Crate.castShadow=true; m0Group.add(m0Crate);
+
+// ── FAT LADY BOSS ──
+const fatLadyRig=(()=>{
+  const ch=buildChar({skin:0xf0c8a0,shirt:0xe04848,pants:0xf5f5f5,hatCol:0xf5f5f5,band:0xf5f5f5,noHat:true});
+  ch.root.scale.setScalar(1.62);
+  // Big round belly (plaid shirt)
+  const belly=new THREE.Mesh(new THREE.SphereGeometry(0.52,14,10),toon(0xe04848));
+  belly.position.set(0,-0.05,0); belly.scale.set(1.15,1.0,1.05); ch.torso.add(belly);
+  // Darker plaid stripes around belly
+  const plaidM=toon(0xa02030);
+  [-0.22,0.02,0.24].forEach(py=>{
+    const ring=new THREE.Mesh(new THREE.CylinderGeometry(0.545,0.545,0.06,14,1,true),plaidM);
+    ring.position.set(0,py-0.05,0); ch.torso.add(ring);
+  });
+  ch.allMats.push(plaidM);
+  // Navy coat draped over shoulders — back panel + side lapels
+  const coatM=new THREE.MeshToonMaterial({color:0x1a2255,gradientMap:GRAD,side:THREE.DoubleSide});
+  const cBack=new THREE.Mesh(new THREE.PlaneGeometry(1.25,1.45),coatM);
+  cBack.position.set(0,-0.18,0.56); cBack.rotation.y=Math.PI; ch.torso.add(cBack);
+  const cLapL=new THREE.Mesh(new THREE.PlaneGeometry(0.42,1.25),coatM);
+  cLapL.position.set(-0.52,-0.12,-0.16); cLapL.rotation.y=Math.PI*0.18; ch.torso.add(cLapL);
+  const cLapR=new THREE.Mesh(new THREE.PlaneGeometry(0.42,1.25),coatM);
+  cLapR.position.set( 0.52,-0.12,-0.16); cLapR.rotation.y=-Math.PI*0.18; ch.torso.add(cLapR);
+  ch.allMats.push(coatM);
+  // Gold epaulettes with fringe
+  const epM=toon(0xe8c030);
+  [-0.56,0.56].forEach(x=>{
+    const ep=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,0.10,8),epM);
+    ep.position.set(x,0.34,0); ch.torso.add(ep);
+    const fr=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.16,0.16,8),epM);
+    fr.position.set(x,0.21,0); ch.torso.add(fr);
+  });
+  ch.allMats.push(epM);
+  // Purple sash belt with hanging tail
+  const sashM=toon(0x8040b0);
+  const sash=new THREE.Mesh(new THREE.CylinderGeometry(0.56,0.54,0.16,14),sashM);
+  sash.position.set(0,-0.42,0); ch.torso.add(sash);
+  const sashTail=new THREE.Mesh(new THREE.PlaneGeometry(0.22,0.55),
+    new THREE.MeshToonMaterial({color:0x8040b0,gradientMap:GRAD,side:THREE.DoubleSide}));
+  sashTail.position.set(-0.42,-0.75,-0.12); ch.torso.add(sashTail);
+  ch.allMats.push(sashM);
+  // Red neckerchief
+  const neckM=toon(0xdd2020);
+  const neck=new THREE.Mesh(new THREE.ConeGeometry(0.30,0.36,4),neckM);
+  neck.position.set(0,0.36,-0.14); neck.rotation.x=0.1; ch.torso.add(neck);
+  ch.allMats.push(neckM);
+  // Dark hair + pink flower
+  const fHairM=toon(0x201018);
+  const fDome=new THREE.Mesh(new THREE.SphereGeometry(0.29,12,8,0,Math.PI*2,0,Math.PI*0.6),fHairM);
+  fDome.position.y=0.08; ch.head.add(fDome);
+  [[-0.24,0.05,0.10],[0.24,0.06,0.10],[0,0.02,0.24]].forEach(([x,y,z])=>{
+    const curl=new THREE.Mesh(new THREE.SphereGeometry(0.10,6,5),fHairM);
+    curl.position.set(x,y,z); ch.head.add(curl);
+  });
+  ch.allMats.push(fHairM);
+  const flower=new THREE.Mesh(new THREE.SphereGeometry(0.10,6,5),toon(0xee3070));
+  flower.position.set(0.22,0.28,0.12); ch.head.add(flower);
+  // White hat with red plume
+  const fHatM=toon(0xf5f5f5);
+  const fBrim=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.58,0.07,14),fHatM);
+  fBrim.position.y=0.40; ch.head.add(fBrim);
+  const fCrown=new THREE.Mesh(new THREE.CylinderGeometry(0.30,0.36,0.30,12),fHatM);
+  fCrown.position.y=0.58; ch.head.add(fCrown);
+  const fBand=new THREE.Mesh(new THREE.CylinderGeometry(0.365,0.37,0.08,12),toon(0xdd2040));
+  fBand.position.y=0.47; ch.head.add(fBand);
+  [[-0.30,0.62,0.15],[-0.38,0.55,0.05],[-0.26,0.68,0.02]].forEach(([x,y,z])=>{
+    const plume=new THREE.Mesh(new THREE.SphereGeometry(0.09,6,5),toon(0xdd2040));
+    plume.position.set(x,y,z); ch.head.add(plume);
+  });
+  ch.allMats.push(fHatM);
+  // Red shoes
+  const fShoeM=toon(0xcc1020);
+  [ch.legR,ch.legL].forEach((leg,si)=>{
+    const shoe=new THREE.Mesh(new THREE.CapsuleGeometry(0.12,0.42,4,6),fShoeM);
+    shoe.position.set((si===0?-1:1)*0.04,-0.30,-0.14); shoe.rotation.x=0.24; leg.shin.add(shoe);
+  });
+  ch.allMats.push(fShoeM);
+  // Spiked club resting over right shoulder
+  const clubG=new THREE.Group(); clubG.position.set(0.56,0.30,0.10); ch.torso.add(clubG);
+  const clubShaft=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.07,1.5,8),pbr(0x2a2a30,0.6,0.3));
+  clubShaft.position.y=0.6; clubG.add(clubShaft);
+  const clubHead=new THREE.Mesh(new THREE.SphereGeometry(0.34,10,8),pbr(0x1a1a22,0.5,0.4));
+  clubHead.position.y=1.4; clubG.add(clubHead);
+  for(let si=0;si<8;si++){
+    const sa=(si/8)*Math.PI*2;
+    const spike=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.22,5),pbr(0x33333a,0.4,0.5));
+    spike.position.set(Math.cos(sa)*0.34,1.4,Math.sin(sa)*0.34);
+    spike.rotation.z=-Math.PI/2*Math.cos(sa); spike.rotation.x=Math.PI/2*Math.sin(sa);
+    clubG.add(spike);
+  }
+  clubG.rotation.x=0.9; // rest pose — leaning back over shoulder
+  ch.clubGroup=clubG;
+  ch.root.visible=false; scene.add(ch.root);
+  return ch;
+})();
+fatLadyRig.root.position.set(M0_CX,0,M0_CZ-8);
+const fatLadyHpBar=makeHpBar(fatLadyRig.root,4.6,2.6);
+const fatLady={
+  pos:new THREE.Vector3(M0_CX,0,M0_CZ-8),
+  hp:220, maxHp:220, speed:2.2, attackCd:0, facing:0,
+  dead:false, kbVel:new THREE.Vector3(), flash:0, stagger:0, fallT:-1,
+  active:false, swingT:-1,
+};
+
+// Fat Lady's pirate crew
+const fp1Rig=buildHench(0xc89060,0x503020,0x2a1810,0x552200);
+const fp2Rig=buildHench(0xb87848,0x334455,0x1a2230,0x1a1a1a);
+const fp3Rig=buildHench(0xd8a070,0x772222,0x331111,0x883311);
+const fp4Rig=buildHench(0xa06840,0x226655,0x113330,0x0a0a0a);
+const m0Pirates=[fp1Rig,fp2Rig,fp3Rig,fp4Rig].map((rig,pi)=>({
+  rig,
+  pos:new THREE.Vector3(M0_CX+[3,-3,3,-3][pi],0,M0_CZ+[-3,-3,3,3][pi]),
+  hp:45, maxHp:45, speed:3.0, attackCd:0, facing:0,
+  dead:false, kbVel:new THREE.Vector3(), flash:0, stagger:0, fallT:-1,
+  hpBar:makeHpBar(rig.root,3.0,1.2),
+}));
+
+function hitPirate(p,range,dmg,dir,kbSpd,upward){
+  if(p.dead||player.pos.distanceTo(p.pos)>range) return;
+  p.hp=Math.max(0,p.hp-dmg);
+  p.kbVel.copy(dir).multiplyScalar(kbSpd);
+  if(upward) p.kbVel.y=3.8;
+  p.flash=0.18; p.stagger=0.38;
+  sfx.thud(); setHpBar(p.hpBar,p.hp/p.maxHp);
+  spawnSparks(p.pos.clone().add(new THREE.Vector3(0,1.5,0)));
+  if(p.hp<=0&&!p.dead){
+    p.dead=true; p.fallT=0; sfx.ko(); flashKO();
+    m0PiratesDead++;
+    m2HenchEl.textContent='PIRATES: '+(4-m0PiratesDead)+'/4 REMAINING';
+    if(m0PiratesDead>=4){
+      m0Phase='boss'; fatLady.active=true;
+      m2HenchEl.textContent='DEFEAT FAT LADY!';
+    }
+  }
+}
+function hitFatLady(dmg,dir,kbSpd,upward){
+  if(!fatLady.active||fatLady.dead) return;
+  fatLady.hp=Math.max(0,fatLady.hp-dmg);
+  fatLady.kbVel.copy(dir).multiplyScalar(kbSpd);
+  if(upward) fatLady.kbVel.y=2.2;
+  fatLady.flash=0.18; fatLady.stagger=0.42;
+  sfx.thud(); setHpBar(fatLadyHpBar,fatLady.hp/fatLady.maxHp);
+  spawnSparks(fatLady.pos.clone().add(new THREE.Vector3(0,2.2,0)));
+  if(fatLady.hp<=0&&!fatLady.dead){
+    fatLady.dead=true; fatLady.fallT=0; sfx.ko(); flashKO();
+    m0Phase='win'; m2HenchEl.textContent='';
+    setTimeout(()=>{
+      startDialogue([
+        {name:'KOBE',   text:'You beat her! She made me scrub decks all day...'},
+        {name:'JENSOON',text:'Come with me! Join my crew!'},
+        {name:'KOBE',   text:"Aye! Let's sail to the marine island!"},
+      ],()=>{ endM0(); });
+    },900);
+  }
+}
+function startM0(){
+  m0Active=true; m0Phase='intro'; m0PiratesDead=0;
+  player.pos.set(M0_CX,0,M0_CZ+8); player.facing=0;
+  playerRig.root.position.set(M0_CX,0,M0_CZ+8);
+  kobeRig.root.position.set(M0_CX+3.6,0,M0_CZ+9.5);
+  kobeRig.root.rotation.y=Math.PI;
+  m0Pirates.forEach(p=>{ p.rig.root.visible=true; p.rig.root.position.copy(p.pos); });
+  fatLadyRig.root.visible=true;
+  camPos.set(M0_CX,7,M0_CZ+22); camLook.set(M0_CX,1.5,M0_CZ);
+  m2HenchEl.style.display='';
+  startDialogue([
+    {name:'FAT LADY',text:'Who let this scrawny kid on MY ship?!'},
+    {name:'JENSOON', text:"I'm here for a boat... and a crew!"},
+    {name:'FAT LADY',text:'Crew! Throw him overboard!'},
+  ],()=>{ m0Phase='crew'; m2HenchEl.textContent='DEFEAT THE PIRATES!'; });
+}
+function endM0(){
+  m0Active=false; kobeJoined=true;
+  player.hp=player.maxHp; document.getElementById('pfill').style.width='100%';
+  player.pos.set(0,0,22); player.facing=Math.PI;
+  playerRig.root.position.set(0,0,22);
+  kobeRig.root.position.set(-2.5,0,23);
+  camPos.set(0,8,34); camLook.set(0,1.4,22);
+  m2HenchEl.textContent='KOBE JOINED THE CREW!';
+  setTimeout(()=>{ if(!m2Active) m2HenchEl.textContent=''; },2600);
+}
+
 function spawnHenchWave(wave){
   const waveHenches=m2Henches.filter(h=>h.wave===wave&&!h.spawned);
   const total=waveHenches.length;
@@ -1338,6 +1564,7 @@ const CHARS=[
   {rig:orozRig,   name:'OROZ'},
 ];
 function switchChar(){
+  if(m0Active) return;
   for(let i=1;i<=CHARS.length;i++){
     const idx=(activeCharIdx+i)%CHARS.length;
     const c=CHARS[idx];
@@ -1563,7 +1790,10 @@ function tickKick(dt){
 }
 
 function checkPunchHits(){
-  if(!m2Active){
+  if(m0Active){
+    m0Pirates.forEach(p=>hitPirate(p,4.5,25,player.punch.dir,5.5,false));
+    if(fatLady.active&&!fatLady.dead&&player.pos.distanceTo(fatLady.pos)<=5.0) hitFatLady(22,player.punch.dir,4.0,false);
+  } else if(!m2Active){
     marines.forEach(m=>hitMarine(m,4.0,25,player.punch.dir,5.5,false));
     if(boss.active&&!boss.dead&&player.pos.distanceTo(boss.pos)<=5.5) hitBoss(22,player.punch.dir,4.0,false);
   } else {
@@ -1572,7 +1802,10 @@ function checkPunchHits(){
   }
 }
 function checkKickHits(){
-  if(!m2Active){
+  if(m0Active){
+    m0Pirates.forEach(p=>hitPirate(p,3.5,18,player.kick.dir,7.0,true));
+    if(fatLady.active&&!fatLady.dead&&player.pos.distanceTo(fatLady.pos)<=3.5) hitFatLady(15,player.kick.dir,6.0,true);
+  } else if(!m2Active){
     marines.forEach(m=>hitMarine(m,3.0,18,player.kick.dir,7.0,true));
     if(boss.active&&!boss.dead&&player.pos.distanceTo(boss.pos)<=3.5) hitBoss(15,player.kick.dir,6.0,true);
   } else {
@@ -1757,7 +1990,10 @@ function loop(){
   if(moving){
     mv.normalize();
     player.pos.addScaledVector(mv,player.speed*dt);
-    if(!m2Active){
+    if(m0Active){
+      player.pos.x=Math.max(M0_CX-4.3,Math.min(M0_CX+4.3,player.pos.x));
+      player.pos.z=Math.max(M0_CZ-11.2,Math.min(M0_CZ+11.2,player.pos.z));
+    } else if(!m2Active){
       player.pos.x=Math.max(-60,Math.min(60,player.pos.x));
       player.pos.z=Math.max(-60,Math.min(60,player.pos.z));
     } else {
@@ -1797,7 +2033,7 @@ function loop(){
   tickPunch(dt); tickKick(dt);
 
   // ── WATER DAMAGE (M1 only) ──
-  if(!m2Active){
+  if(!m2Active&&!m0Active){
   const wx=player.pos.x, wz=(player.pos.z+2)/1.05;
   if(Math.sqrt(wx*wx+wz*wz)>38){
     waterDmgTimer+=dt;
@@ -1826,7 +2062,7 @@ function loop(){
   }
 
   // ── KOBE FOLLOWS / FIGHTS ──
-  if(activeRig!==kobeRig&&kobeRig.root.visible){
+  if(kobeJoined&&activeRig!==kobeRig&&kobeRig.root.visible){
     if(!companionCombat(kobeRig,'kobe',10,4.2,1.3,dt)){
       const kobeTarget=new THREE.Vector3(player.pos.x-2,0,player.pos.z+1.2);
       const kobeDelta=kobeTarget.sub(kobeRig.root.position);
@@ -1917,8 +2153,86 @@ function loop(){
     interactEl.style.opacity='0'; interactTarget=null;
   }
 
-  // ── M1 ENEMIES (skip in M2) ──
-  if(!m2Active){
+  // ── M0 ENEMIES (Fat Lady's ship) ──
+  if(m0Active){
+    // Pirate crew AI
+    if(m0Phase==='crew'||m0Phase==='boss'){
+      m0Pirates.forEach(p=>{
+        if(p.dead){
+          if(p.fallT>=0){
+            p.fallT=Math.min(p.fallT+dt,0.55);
+            const fe=1-Math.pow(1-p.fallT/0.55,2);
+            p.rig.root.rotation.z=fe*(Math.PI/2);
+            p.rig.root.position.y=-fe*0.4;
+            p.rig.allMats.forEach(m=>m.color.lerp(new THREE.Color(0.4,0.4,0.4),0.05));
+          }
+          return;
+        }
+        p.kbVel.y-=22*dt; p.kbVel.multiplyScalar(Math.pow(0.08,dt));
+        p.pos.addScaledVector(p.kbVel,dt);
+        p.pos.x=Math.max(M0_CX-4.3,Math.min(M0_CX+4.3,p.pos.x));
+        p.pos.z=Math.max(M0_CZ-11.2,Math.min(M0_CZ+11.2,p.pos.z));
+        p.pos.y=Math.max(0,p.pos.y);
+        if(p.stagger>0){ p.stagger-=dt; }
+        else {
+          const toP0=new THREE.Vector3(player.pos.x-p.pos.x,0,player.pos.z-p.pos.z);
+          const dist0=toP0.length();
+          if(dist0>1.4){ toP0.normalize(); p.pos.x+=toP0.x*p.speed*dt; p.pos.z+=toP0.z*p.speed*dt; p.facing=Math.atan2(-toP0.x,-toP0.z); }
+          p.attackCd-=dt;
+          if(dist0<1.8&&p.attackCd<=0){ damagePlayer(6); p.attackCd=2.2; }
+        }
+        p.rig.root.position.set(p.pos.x,p.pos.y,p.pos.z);
+        p.rig.root.rotation.y=p.facing;
+        if(p.flash>0){ p.flash-=dt; p.rig.allMats.forEach(m=>m.emissive&&(m.emissive.setScalar(p.flash>0?0.55:0))); }
+        setHpBar(p.hpBar,p.hp/p.maxHp);
+      });
+    }
+    // Fat Lady AI
+    if(m0Phase==='boss'&&fatLady.active&&!fatLady.dead){
+      fatLady.kbVel.y-=22*dt; fatLady.kbVel.multiplyScalar(Math.pow(0.08,dt));
+      fatLady.pos.addScaledVector(fatLady.kbVel,dt);
+      fatLady.pos.x=Math.max(M0_CX-4.3,Math.min(M0_CX+4.3,fatLady.pos.x));
+      fatLady.pos.z=Math.max(M0_CZ-11.2,Math.min(M0_CZ+11.2,fatLady.pos.z));
+      fatLady.pos.y=Math.max(0,fatLady.pos.y);
+      if(fatLady.stagger>0){ fatLady.stagger-=dt; }
+      else {
+        const ftoP=new THREE.Vector3(player.pos.x-fatLady.pos.x,0,player.pos.z-fatLady.pos.z);
+        const fdist=ftoP.length();
+        if(fdist>1.8){ ftoP.normalize(); fatLady.pos.x+=ftoP.x*fatLady.speed*dt; fatLady.pos.z+=ftoP.z*fatLady.speed*dt; fatLady.facing=Math.atan2(-ftoP.x,-ftoP.z); }
+        fatLady.attackCd-=dt;
+        if(fdist<2.4&&fatLady.attackCd<=0){ damagePlayer(14); fatLady.attackCd=2.8; fatLady.swingT=0; sfx.boss(); }
+      }
+      // Club smash animation
+      if(fatLady.swingT>=0){
+        fatLady.swingT=Math.min(fatLady.swingT+dt,1.0);
+        const fsw=fatLady.swingT;
+        if(fsw<0.25){ fatLadyRig.clubGroup.rotation.x=0.9-(fsw/0.25)*2.2; }
+        else if(fsw<0.55){ fatLadyRig.clubGroup.rotation.x=-1.3+((fsw-0.25)/0.30)*2.8; }
+        else { fatLadyRig.clubGroup.rotation.x=1.5-((fsw-0.55)/0.45)*0.6; }
+        if(fatLady.swingT>=1.0){ fatLady.swingT=-1; fatLadyRig.clubGroup.rotation.x=0.9; }
+      }
+      fatLadyRig.root.position.set(fatLady.pos.x,fatLady.pos.y,fatLady.pos.z);
+      fatLadyRig.root.rotation.y=fatLady.facing;
+      if(fatLady.flash>0){ fatLady.flash-=dt; fatLadyRig.allMats.forEach(m=>m.emissive&&(m.emissive.setScalar(fatLady.flash>0?0.55:0))); }
+      setHpBar(fatLadyHpBar,fatLady.hp/fatLady.maxHp);
+    }
+    // Fat Lady fall
+    if(fatLady.dead&&fatLady.fallT>=0){
+      fatLady.fallT=Math.min(fatLady.fallT+dt,0.7);
+      const ffe=1-Math.pow(1-fatLady.fallT/0.7,2);
+      fatLadyRig.root.rotation.z=ffe*(Math.PI/2);
+      fatLadyRig.root.position.y=-ffe*0.5;
+      fatLadyRig.allMats.forEach(m=>m.color&&m.color.lerp(new THREE.Color(0.35,0.35,0.35),0.04));
+    }
+    // Kobe waits nervously by the stern
+    if(!kobeJoined){
+      kobeRig.root.position.y=Math.sin(total*2.4)*0.03;
+      kobeRig.root.rotation.y=Math.atan2(player.pos.x-kobeRig.root.position.x,player.pos.z-kobeRig.root.position.z);
+    }
+  } // end m0Active enemies
+
+  // ── M1 ENEMIES (skip in M0/M2) ──
+  if(!m2Active&&!m0Active){
   // ── MARINES ──
   marines.forEach(m=>{
     if(m.dead){
@@ -2296,6 +2610,7 @@ function loop(){
   composer.render();
 }
 
+startM0();
 loop();
 </script>
 </body>
