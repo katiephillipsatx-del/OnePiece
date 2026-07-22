@@ -1634,17 +1634,24 @@ function flashKO(){
 // ── CREW COMPANION COMBAT ─────────────────────────────────────
 const compCd={jen:0,kobe:0,nora:0,oroz:0};
 const compSwing={jen:-1,kobe:-1,nora:-1};
-function nearestEnemy(p){
-  let best=null,bd=Infinity;
+const compClaims=new Map(); // enemy object -> companion key fighting it
+function nearestEnemy(p,key){
+  // Drop this companion's old claim; it re-claims below if it picks a target
+  for(const [obj,k] of compClaims) if(k===key) compClaims.delete(obj);
+  const cands=[];
   if(!m2Active){
-    marines.forEach(m=>{ if(m.dead) return; const d=p.distanceTo(m.pos); if(d<bd){bd=d;best={kind:'marine',obj:m,pos:m.pos};} });
-    if(boss.active&&!boss.dead){ const d=p.distanceTo(boss.pos); if(d<bd){bd=d;best={kind:'boss',obj:boss,pos:boss.pos};} }
+    marines.forEach(m=>{ if(m.dead) return; const d=p.distanceTo(m.pos); if(d<=9.5) cands.push({kind:'marine',obj:m,pos:m.pos,dist:d}); });
+    if(boss.active&&!boss.dead){ const d=p.distanceTo(boss.pos); if(d<=9.5) cands.push({kind:'boss',obj:boss,pos:boss.pos,dist:d}); }
   } else if(m2Phase==='henchmen'||m2Phase==='boss'){
-    m2Henches.forEach(h=>{ if(h.dead||!h.spawned) return; const d=p.distanceTo(h.pos); if(d<bd){bd=d;best={kind:'hench',obj:h,pos:h.pos};} });
-    if(m2Phase==='boss'&&bunny2.active&&!bunny2.dead){ const d=p.distanceTo(bunny2.pos); if(d<bd){bd=d;best={kind:'bunny',obj:bunny2,pos:bunny2.pos};} }
+    m2Henches.forEach(h=>{ if(h.dead||!h.spawned) return; const d=p.distanceTo(h.pos); if(d<=9.5) cands.push({kind:'hench',obj:h,pos:h.pos,dist:d}); });
+    if(m2Phase==='boss'&&bunny2.active&&!bunny2.dead){ const d=p.distanceTo(bunny2.pos); if(d<=9.5) cands.push({kind:'bunny',obj:bunny2,pos:bunny2.pos,dist:d}); }
   }
-  if(best) best.dist=bd;
-  return best;
+  if(!cands.length) return null;
+  cands.sort((a,b)=>a.dist-b.dist);
+  // Prefer the closest enemy nobody else is fighting; share only if all are taken
+  const chosen=cands.find(c=>!compClaims.has(c.obj))||cands[0];
+  compClaims.set(chosen.obj,key);
+  return chosen;
 }
 function companionDamage(t,dmg,fromPos){
   const dir=new THREE.Vector3(t.pos.x-fromPos.x,0,t.pos.z-fromPos.z).normalize();
@@ -1657,8 +1664,8 @@ function companionDamage(t,dmg,fromPos){
 // (caller should skip its follow logic that frame).
 function companionCombat(rig,key,dmg,spd,animOff,dt,useSword){
   compCd[key]=Math.max(0,compCd[key]-dt);
-  const t=nearestEnemy(rig.root.position);
-  if(!t||t.dist>9.5) return false;
+  const t=nearestEnemy(rig.root.position,key);
+  if(!t) return false;
   const toT=new THREE.Vector3(t.pos.x-rig.root.position.x,0,t.pos.z-rig.root.position.z);
   const d=toT.length();
   rig.root.rotation.y=Math.atan2(toT.x,toT.z);
