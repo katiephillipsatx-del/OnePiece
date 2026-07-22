@@ -990,6 +990,31 @@ circusGroup.add(chainMesh);
   bBanner.rotation.y=ba+Math.PI/2; circusGroup.add(bBanner);
 });
 
+// Big top tent — striped wall + conical roof enclosing the whole arena
+const TENT_R=19, TENT_WALL_H=11, TENT_SEGS=24;
+for(let ti=0;ti<TENT_SEGS;ti++){
+  const tMat=new THREE.MeshToonMaterial({color:ti%2===0?0xdd1010:0xf8f8f8,gradientMap:GRAD,side:THREE.DoubleSide});
+  const wallSeg=new THREE.Mesh(
+    new THREE.CylinderGeometry(TENT_R,TENT_R,TENT_WALL_H,3,1,true,(ti/TENT_SEGS)*Math.PI*2,(1/TENT_SEGS)*Math.PI*2),
+    tMat);
+  wallSeg.position.y=TENT_WALL_H/2; circusGroup.add(wallSeg);
+  const roofSeg=new THREE.Mesh(
+    new THREE.CylinderGeometry(0.3,TENT_R+0.6,8,3,1,true,(ti/TENT_SEGS)*Math.PI*2,(1/TENT_SEGS)*Math.PI*2),
+    tMat);
+  roofSeg.position.y=TENT_WALL_H+4; circusGroup.add(roofSeg);
+}
+// Peak pole + flag on top of the tent
+const peakPole=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,2.2,6),pbr(0x8a5a20,0.8));
+peakPole.position.y=TENT_WALL_H+8+0.9; circusGroup.add(peakPole);
+const peakFlag=new THREE.Mesh(new THREE.PlaneGeometry(1.6,0.9),
+  new THREE.MeshToonMaterial({color:0xffdd00,side:THREE.DoubleSide,gradientMap:GRAD}));
+peakFlag.position.set(0.8,TENT_WALL_H+8+1.6,0); circusGroup.add(peakFlag);
+// Warm interior lights so the inside of the tent glows
+[[6,-6],[-6,6],[6,6],[-6,-6]].forEach(([lx,lz])=>{
+  const tl=new THREE.PointLight(0xffd9a0,1.1,26);
+  tl.position.set(lx,8,lz); circusGroup.add(tl);
+});
+
 // Breakable starting crate
 const crateHalf=2.0; // box is 4×4 wide, 4 tall
 const crateMat=new THREE.MeshStandardMaterial({color:0x9a6020,roughness:0.85,side:THREE.DoubleSide});
